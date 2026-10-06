@@ -1,0 +1,7 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy[asyncio]>=2.0
+aiosqlite>=0.20        # dev (SQLite)
+asyncpg>=0.29          # prod (PostgreSQL)
+httpx>=0.27
+pydantic-settings>=2.3

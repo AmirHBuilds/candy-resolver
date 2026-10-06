@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: candy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-candy_internal}   # db is not exposed outside this compose network
+      POSTGRES_DB: candyresolver
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U candy -d candyresolver"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://candy:${POSTGRES_PASSWORD:-candy_internal}@db:5432/candyresolver
+      DATA_DIR: /data
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}            # empty -> generated on first start
+      SIGNING_SECRET: ${SIGNING_SECRET:-}      # empty -> generated on first start
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}    # e.g. https://candy.example.com
+      LIBRARY_TTL_HOURS: ${LIBRARY_TTL_HOURS:-24}
+      LIBRARY_MAX_SIZE_GB: ${LIBRARY_MAX_SIZE_GB:-20}
+      LIBRARY_CONCURRENCY: ${LIBRARY_CONCURRENCY:-2}
+      SCRIPT_RUN_AS_UID: "65534"
+      SCRIPT_RUN_AS_GID: "65534"
+    volumes:
+      - candy_data:/data      # secrets + downloaded library
+      # To keep the library on a bigger disk, replace the line above with e.g.:
+      # - /mnt/bigdisk/candyresolver:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+volumes:
+  pgdata:
+  candy_data:

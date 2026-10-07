@@ -1,6 +1,7 @@
 import ast
 import shutil
 import time
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
@@ -255,3 +256,14 @@ async def admin_delete_library(item_id: str, db: AsyncSession = Depends(get_db))
     item.status = "deleted"
     item.file_path = None
     await db.commit()
+
+
+# ---------------- example scripts (the UI offers them as starting points) ----------------
+EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
+
+
+@router.get("/examples")
+async def list_examples():
+    if not EXAMPLES_DIR.is_dir():
+        return []
+    return [{"name": p.stem, "code": p.read_text(encoding="utf-8")} for p in sorted(EXAMPLES_DIR.glob("*.py"))]

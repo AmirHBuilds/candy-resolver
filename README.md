@@ -13,7 +13,7 @@ signed link on your own domain that auto-deletes after N hours.
 
 ## Admin UI
 Open **http://localhost:8000/ui** and sign in with the admin token. You can:
-- **Sources:** create / edit / disable / delete sources; edit scripts in the browser (every save is a new version, one click to activate or roll back); **test-run** a script against any TMDB id and see the result or the error.
+- **Sources:** create / edit / disable / delete sources; edit scripts in the browser (a dropdown loads the bundled examples as starting points) (every save is a new version, one click to activate or roll back); **test-run** a script against any TMDB id and see the result or the error.
 - **API keys:** create (shown once), enable/disable, change rate limits.
 - **Library:** live download progress, delete files early.
 - **Tasks:** recent requests with per-source status, timing and errors.
@@ -76,6 +76,18 @@ def resolve(ctx):          # may also be `async def`
 ```
 `print()` is safe. Raise an exception to report an error; it's stored on that source's run.
 
+## HLS (.m3u8) streams
+Return a stream with `"format": "hls"` (or a URL ending in `.m3u8`). In library mode the server remuxes it to a single **mp4 with ffmpeg**
+(no re-encoding, so it's fast and uses little CPU), including AES-128 encrypted playlists and separate audio tracks.
+For a master playlist it picks the quality the client asks for, default the best:
+```bash
+curl -X POST localhost:8000/v1/tasks/tsk_.../library -H "X-API-Key: $K" -H Content-Type:application/json \
+     -d '{"stream_id":"str_...","quality":"720p"}'      # "quality" is optional and only used for HLS
+```
+Asking again for the same stream with a different quality creates a separate library file. Progress is estimated from the playlist length.
+Not supported: live streams and DRM (Widevine/FairPlay). ffmpeg is installed in the Docker image; without Docker install it yourself.
+`examples/hls_template.py` shows what a script returns for an HLS source.
+
 ## Script sandbox
 Fresh process per run, temp dir deleted after, scrubbed env (no secrets), memory/CPU/file limits, hard timeout + process-group kill,
 output cap. In Docker, scripts also run as the unprivileged user `nobody`, so they can't read secrets or the library.
@@ -83,7 +95,8 @@ Not restricted: network access. (Bubblewrap / network policies can be added late
 
 ## Limits to know
 - Downloads and tasks run inside the API process; a restart marks running ones `failed` (re-request them).
+- ffmpeg reads untrusted playlists: it only gets http/https (no `file:`), but it is not sandboxed like scripts are. Only add sources you trust.
 - Rate limiting is in-memory (single worker). Tables are auto-created; switch to Alembic before changing the schema.
 - Settings: `LIBRARY_TTL_HOURS`, `LIBRARY_MAX_SIZE_GB`, `LIBRARY_CONCURRENCY`, ... (see `.env.example`).
 
-Tests: `python -m tests.smoke_runner` and `python -m tests.smoke_units`
+Tests: `python -m tests.smoke_runner`, `python -m tests.smoke_units`, `python -m tests.smoke_hls`

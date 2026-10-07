@@ -98,6 +98,7 @@ class ApiKeyUpdate(BaseModel):
 class LibraryRequest(BaseModel):
     stream_id: str
     ttl_hours: int | None = Field(default=None, ge=1, description="Auto-delete this many hours after the download finishes")
+    quality: str | None = Field(default=None, description="HLS streams only: pick this quality (e.g. '720p'); default is the best")
 
 
 class LibraryItemOut(BaseModel):

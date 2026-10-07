@@ -9,6 +9,7 @@ from ..auth import require_api_key
 from ..config import settings
 from ..db import get_db
 from ..downloader import cancel_download, start_download
+from ..fileutil import is_hls
 from ..library import item_to_out
 from ..models import ApiKey, LibraryItem, SourceRun, Stream, Task, as_utc, utcnow
 from ..resolver import is_expired
@@ -49,10 +50,14 @@ async def request_library(task_id: str, body: LibraryRequest, request: Request, 
         raise HTTPException(404, "stream not found in this task")
     stream, run = row
 
-    # Same stream already queued / downloading / ready -> reuse it (and extend its time if asked).
+    # For HLS the client may choose the quality; for plain files the stream's own quality label stands.
+    quality = (body.quality or stream.quality) if is_hls(stream.format, stream.url) else stream.quality
+
+    # Same stream (and quality) already queued / downloading / ready -> reuse it, extend its time if asked.
+    same_q = LibraryItem.quality.is_(None) if quality is None else LibraryItem.quality == quality
     existing = (await db.execute(
         select(LibraryItem)
-        .where(LibraryItem.stream_id == stream.id, LibraryItem.api_key_id == key.id,
+        .where(LibraryItem.stream_id == stream.id, LibraryItem.api_key_id == key.id, same_q,
                LibraryItem.status.in_(["queued", "downloading", "ready"]))
         .order_by(LibraryItem.requested_at.desc()))).scalars().first()
     if existing and existing.status == "ready" and as_utc(existing.delete_at) <= utcnow():
@@ -68,7 +73,7 @@ async def request_library(task_id: str, body: LibraryRequest, request: Request, 
         return item_to_out(existing, _base(request))
 
     item = LibraryItem(api_key_id=key.id, task_id=task_id, stream_id=stream.id,
-                       source_name=run.source_name, quality=stream.quality, format=stream.format,
+                       source_name=run.source_name, quality=quality, format=stream.format,
                        status="queued", ttl_hours=ttl)
     db.add(item)
     await db.commit()

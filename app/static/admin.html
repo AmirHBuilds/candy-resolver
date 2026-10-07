@@ -236,7 +236,10 @@ const openSource = guard(async id => {
       </div>
     </div>
     <div class="card">
-      <b>Script</b> <span class="muted">— each save creates a new version; old versions are kept</span>
+      <div class="row" style="justify-content:space-between;margin-bottom:0">
+        <div style="display:block"><b>Script</b> <span class="muted">— each save creates a new version; old versions are kept</span></div>
+        <select id="exSel" onchange="loadExample(this.value)"><option value="">Load an example…</option></select>
+      </div>
       <div id="vers" style="margin:10px 0"></div>
       <textarea id="code" class="code" spellcheck="false" placeholder="def resolve(ctx): ..."></textarea>
       <div class="row" style="margin-top:10px">
@@ -262,8 +265,22 @@ const openSource = guard(async id => {
       t.value = t.value.slice(0, p) + '    ' + t.value.slice(t.selectionEnd); t.selectionStart = t.selectionEnd = p + 4; }
   });
   renderVersions();
+  fillExamples();
   if (curVer) await loadVersion(curVer); else { $('#code').value = TEMPLATE; $('#actBtn').classList.add('hidden'); }
 });
+
+let examples = null;
+async function fillExamples() {
+  try { if (!examples) examples = await api('GET', '/examples'); } catch (e) { examples = []; }
+  const sel = $('#exSel'); if (!sel) return;
+  sel.innerHTML = '<option value="">Load an example…</option>' +
+    examples.map((x, i) => `<option value="${i}">${esc(x.name)}</option>`).join('');
+}
+function loadExample(i) {
+  if (i === '') return;
+  if ($('#code').value.trim() && !confirm('Replace the editor content with this example? (Nothing is saved until you click "Save as new version".)')) { $('#exSel').value = ''; return; }
+  $('#code').value = examples[+i].code; $('#note').value = 'from example: ' + examples[+i].name; $('#exSel').value = '';
+}
 
 function renderVersions() {
   $('#vers').innerHTML = scripts.map(v => `<span class="ver ${v.version === curVer ? 'sel' : ''}" onclick="loadVersion(${v.version})">v${v.version}${v.active ? ' ●' : ''}</span>`).join('')

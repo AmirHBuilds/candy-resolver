@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     library_max_size_gb: int = 20        # refuse bigger files
     library_min_free_gb: int = 2         # keep this much disk free
     signed_url_ttl_min: int = 360        # lifetime of each signed file link
+    ffmpeg_path: str = "ffmpeg"
+    library_hls_timeout_min: int = 240   # give up on an HLS download after this long
 
     @property
     def library_path(self) -> Path:

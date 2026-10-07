@@ -12,3 +12,7 @@ def pick_ext(fmt: str | None, url: str) -> str:
         return f
     suffix = Path(urlparse(url).path).suffix.lower().lstrip(".")
     return suffix if suffix in EXTS else "mp4"
+
+
+def is_hls(fmt: str | None, url: str) -> bool:
+    return (fmt or "").lower() in ("hls", "m3u8") or urlparse(url).path.lower().endswith(".m3u8")

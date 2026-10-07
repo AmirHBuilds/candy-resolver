@@ -50,7 +50,9 @@ except Exception:
 '''
 
 
-def _make_preexec():
+def _make_preexec(uid: int | None = None, gid: int | None = None):
+    """Runs in the child just before exec: resource limits, then (optionally) drop to an unprivileged user.
+    This is done here instead of subprocess's user=/group= because uvloop (used by uvicorn) rejects those."""
     if os.name != "posix":
         return None
     import resource
@@ -70,6 +72,10 @@ def _make_preexec():
                 resource.setrlimit(lim, (val, val))
             except (ValueError, OSError):
                 pass  # limit not supported on this platform
+        if uid is not None:  # last, because it cannot be undone
+            os.setgroups([])
+            os.setgid(gid)
+            os.setuid(uid)
 
     return apply
 
@@ -115,14 +121,14 @@ async def run_script(code: str, ctx: dict, timeout_s: int) -> dict:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
 
-        extra: dict = {}
-        if settings.script_run_as_uid is not None:
-            uid = settings.script_run_as_uid
-            gid = settings.script_run_as_gid if settings.script_run_as_gid is not None else uid
+        uid = settings.script_run_as_uid
+        gid = settings.script_run_as_gid if settings.script_run_as_gid is not None else uid
+        if uid is not None:
+            if os.geteuid() != 0:
+                raise ScriptError("SCRIPT_RUN_AS_UID is set but the server is not running as root")
             for p in (tmp, script_path, harness_path):
                 os.chown(p, uid, gid)
             os.chmod(tmp, 0o700)
-            extra = {"user": uid, "group": gid}
 
         # Scrubbed environment: no app secrets, DB URL, or API keys reach the script.
         env = {
@@ -141,8 +147,7 @@ async def run_script(code: str, ctx: dict, timeout_s: int) -> dict:
             cwd=tmp,
             env=env,
             start_new_session=True,  # own process group so we can kill children too
-            preexec_fn=_make_preexec(),
-            **extra,
+            preexec_fn=_make_preexec(uid, gid),
         )
 
         payload = json.dumps(ctx).encode()

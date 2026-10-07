@@ -44,6 +44,32 @@ async def main():
     ok = not any(k in out["env_keys"] for k in ("TMDB_API_KEY", "ADMIN_TOKEN", "DATABASE_URL"))
     print("PASS" if ok else "FAIL", "env scrubbed:", out["env_keys"]); results.append(ok)
 
+    import os
+    if os.name == "posix" and os.geteuid() == 0:
+        from app.config import settings
+        secret = "/tmp/cr_root_only_secret"
+        with open(secret, "w") as f:
+            f.write("top secret")
+        os.chmod(secret, 0o600)
+        settings.script_run_as_uid = settings.script_run_as_gid = 65534
+        try:
+            code = ("import os\n"
+                    "def resolve(ctx):\n"
+                    "    try:\n"
+                    f"        open({secret!r}).read(); leaked = True\n"
+                    "    except PermissionError:\n"
+                    "        leaked = False\n"
+                    "    return {'uid': os.getuid(), 'leaked': leaked}")
+            out = await run_script(code, CTX, 10)
+            ok = out["uid"] == 65534 and out["leaked"] is False
+            print("PASS" if ok else "FAIL", "runs as nobody, cannot read root-only file:", out)
+            results.append(ok)
+        finally:
+            settings.script_run_as_uid = settings.script_run_as_gid = None
+            os.remove(secret)
+    else:
+        print("SKIP uid-drop test (needs root)")
+
     print("\nALL PASSED" if all(results) else "\nSOME FAILED")
 
 

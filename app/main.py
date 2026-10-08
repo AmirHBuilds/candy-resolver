@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from . import models  # noqa: F401  (registers tables)
 from .config import ensure_secrets, settings
 from .db import Base, engine
+from .migrate import migrate
 from .library import expire_library, fail_stuck_library, sweep_orphans
 from .resolver import fail_stuck_tasks, purge_expired
 from .routers import admin, files, library, resolve
@@ -30,6 +31,7 @@ async def lifespan(app: FastAPI):
     # Phase 1-2: create tables on startup. Switch to Alembic migrations before the schema changes.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await migrate(engine)  # adds columns introduced after your database was first created
     await fail_stuck_tasks()
     await fail_stuck_library()
     await sweep_orphans()

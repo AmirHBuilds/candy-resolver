@@ -26,11 +26,11 @@ class StreamOut(BaseModel):
     url: str
     size: int | None
     headers: dict | None
-    extra: dict | None
 
 
 class SourceResultOut(BaseModel):
     source: str
+    starred: bool = False       # true = a source you marked as reliable
     status: str
     error: str | None
     duration_ms: int | None
@@ -49,12 +49,17 @@ class TaskOut(BaseModel):
     title: str | None
     created_at: datetime
     expires_at: datetime
+    version: int = 0           # grows every time a source finishes; pass it back as ?after=
+    sources_total: int = 0
+    sources_done: int = 0
     sources: list[SourceResultOut]
 
 
 # ---- admin ----
 class SourceIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+    public_name: str = Field(default="", max_length=100)   # shown to API clients instead of `name`
+    starred: bool = False
     base_url: str = ""
     language: str = "en"
     enabled: bool = True
@@ -63,6 +68,8 @@ class SourceIn(BaseModel):
 
 class SourceUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
+    public_name: str | None = Field(default=None, max_length=100)
+    starred: bool | None = None
     base_url: str | None = None
     language: str | None = None
     enabled: bool | None = None

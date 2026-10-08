@@ -76,6 +76,33 @@ def resolve(ctx):          # may also be `async def`
 ```
 `print()` is safe. Raise an exception to report an error; it's stored on that source's run.
 
+## Fast first answer + staying up to date
+Sources finish at different speeds. Don't wait for the slowest one:
+```bash
+# 1) answer as soon as ONE source has streams (max 8s here); the others keep running in the background
+#    (use wait=first_starred to count only your starred / reliable sources)
+curl -X POST "localhost:8000/v1/resolve?wait=first&wait_s=8" -H "X-API-Key: $K" -H Content-Type:application/json \
+     -d '{"tmdb_id":10331,"type":"movie"}'          # -> 200 if finished, 202 if still running
+
+# 2) keep asking, but let the server hold the request until something NEW happens (long polling)
+curl "localhost:8000/v1/tasks/tsk_...?after=1&wait_s=25" -H "X-API-Key: $K"   # `after` = the `version` you last saw
+```
+Every response has `status` (`pending` -> `running` -> `done` | `failed`), `version` (+1 each time a source finishes) and
+`sources_done` / `sources_total`. Your website's backend loops until `status` is `done` or `failed`:
+```js
+let t = await resolve({wait: "first", wait_s: 8});          // show t.sources[].streams right away
+while (t.status === "pending" || t.status === "running") {
+  t = await get(`/v1/tasks/${t.task_id}?after=${t.version}&wait_s=25`);   // returns the moment a source finishes
+  show(t);                                                   // new qualities / servers appear as they arrive
+}
+```
+- Each request returns after at most `wait_s` seconds even if nothing changed (you just call again with the same `after`), so a dropped connection or a restart is never a problem: any task can be re-read at any time until it expires.
+- `wait=first` returns when a source with streams exists; if no source finds anything it returns when the task is done.
+- **Starred sources:** star the sources you trust in the admin panel (Sources -> click the star). `wait=first_starred` answers as soon as a **starred** source has streams, ignoring faster unstarred ones. Fallback so you never wait for nothing: once every starred source has finished without streams (or none are starred), it returns as soon as any source has streams. Every source in a response has `"starred": true/false`.
+- Plain polling still works (`GET /v1/tasks/{id}` with no `wait_s`), but each call counts toward the key's rate limit (default 60/min), so prefer long polling.
+- Long polling holds no database connection while waiting, and wakes instantly when a source finishes (with a once-a-second safety re-check).
+- Tasks that were running when the server stopped are marked `failed` on restart.
+
 ## HLS (.m3u8) streams
 Return a stream with `"format": "hls"` (or a URL ending in `.m3u8`). In library mode the server remuxes it to a single **mp4 with ffmpeg**
 (no re-encoding, so it's fast and uses little CPU), including AES-128 encrypted playlists and separate audio tracks.
@@ -99,4 +126,4 @@ Not restricted: network access. (Bubblewrap / network policies can be added late
 - Rate limiting is in-memory (single worker). Tables are auto-created; switch to Alembic before changing the schema.
 - Settings: `LIBRARY_TTL_HOURS`, `LIBRARY_MAX_SIZE_GB`, `LIBRARY_CONCURRENCY`, ... (see `.env.example`).
 
-Tests: `python -m tests.smoke_runner`, `python -m tests.smoke_units`, `python -m tests.smoke_hls`
+Tests: `python -m tests.smoke_runner`, `python -m tests.smoke_units`, `python -m tests.smoke_hls`, `python -m tests.smoke_waiting`

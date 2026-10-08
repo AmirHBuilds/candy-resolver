@@ -5,7 +5,7 @@ from sqlalchemy import select, update
 
 from .config import settings
 from .db import SessionLocal
-from .models import LibraryItem, as_utc, utcnow
+from .models import LibraryItem, as_utc, public_label, utcnow
 from .schemas import LibraryItemOut
 from .signing import sign
 
@@ -24,7 +24,7 @@ def item_to_out(item: LibraryItem, base_url: str) -> LibraryItemOut:
     else:
         progress = 1.0 if item.status == "ready" else None
     return LibraryItemOut(
-        id=item.id, task_id=item.task_id, stream_id=item.stream_id, source=item.source_name,
+        id=item.id, task_id=item.task_id, stream_id=item.stream_id, source=item.public_name or public_label(None),
         quality=item.quality, format=item.format, status=item.status, error=item.error,
         progress=progress, size=item.size, total_bytes=item.total_bytes, ttl_hours=item.ttl_hours,
         requested_at=item.requested_at, ready_at=item.ready_at, delete_at=item.delete_at,

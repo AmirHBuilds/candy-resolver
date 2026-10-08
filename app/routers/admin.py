@@ -37,7 +37,7 @@ def validate_code(code: str) -> None:
 
 def source_dict(s: Source) -> dict:
     active = next((sc.version for sc in s.scripts if sc.active), None)
-    return {"id": s.id, "name": s.name, "base_url": s.base_url, "language": s.language,
+    return {"id": s.id, "name": s.name, "public_name": s.public_name, "starred": s.starred, "base_url": s.base_url, "language": s.language,
             "enabled": s.enabled, "timeout_s": s.timeout_s, "active_version": active,
             "created_at": s.created_at}
 
@@ -228,13 +228,14 @@ async def admin_tasks(limit: int = 50, db: AsyncSession = Depends(get_db)):
         "id": t.id, "title": (t.meta or {}).get("title"), "type": t.media_type, "tmdb_id": t.tmdb_id,
         "season": t.season, "episode": t.episode, "status": t.status,
         "created_at": t.created_at, "expires_at": t.expires_at,
-        "runs": [{"source": r.source_name, "status": r.status, "error": r.error,
+        "runs": [{"source": r.source_name, "public_name": r.public_name, "starred": bool(r.starred), "status": r.status, "error": r.error,
                   "duration_ms": r.duration_ms, "streams": len(r.streams)} for r in t.runs],
     } for t in res.scalars()]
 
 
 def library_dict(i: LibraryItem) -> dict:
-    return {"id": i.id, "task_id": i.task_id, "source": i.source_name, "quality": i.quality,
+    return {"id": i.id, "task_id": i.task_id, "source": i.source_name, "public_name": i.public_name,
+            "quality": i.quality,
             "format": i.format, "status": i.status, "error": i.error, "size": i.size,
             "total_bytes": i.total_bytes, "ttl_hours": i.ttl_hours, "requested_at": i.requested_at,
             "ready_at": i.ready_at, "delete_at": i.delete_at}

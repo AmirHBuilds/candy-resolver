@@ -21,6 +21,14 @@ def as_utc(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
+def public_label(name: str | None, source_id: int | None = None) -> str:
+    """The name clients see for a provider. Never the real name; falls back to a neutral label."""
+    n = (name or "").strip()
+    if n:
+        return n
+    return f"Server {source_id}" if source_id else "Server"
+
+
 def default_expiry() -> datetime:
     return utcnow() + timedelta(hours=settings.task_ttl_hours)
 
@@ -29,10 +37,12 @@ class Source(Base):
     __tablename__ = "sources"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)          # real name, admin only
+    public_name: Mapped[str] = mapped_column(String(100), default="")    # what API clients see
     base_url: Mapped[str] = mapped_column(String(500), default="")
     language: Mapped[str] = mapped_column(String(20), default="en")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    starred: Mapped[bool] = mapped_column(Boolean, default=False)       # trusted / reliable source
     timeout_s: Mapped[int] = mapped_column(Integer, default=30)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -81,6 +91,9 @@ class Task(Base):
     episode: Mapped[int | None] = mapped_column(Integer, nullable=True)
     meta: Mapped[dict] = mapped_column(JSON, default=dict)  # TMDB info handed to scripts
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending|running|done|failed
+    version: Mapped[int] = mapped_column(Integer, default=0)        # +1 every time a source finishes
+    sources_total: Mapped[int] = mapped_column(Integer, default=0)  # how many sources this task runs
+    starred_total: Mapped[int] = mapped_column(Integer, default=0)  # how many of them are starred
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=default_expiry)
 
@@ -97,6 +110,8 @@ class SourceRun(Base):
     task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"))
     source_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # no FK: history survives source deletion
     source_name: Mapped[str] = mapped_column(String(100))
+    public_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    starred: Mapped[bool] = mapped_column(Boolean, default=False)       # snapshot of the source's star at run time
     script_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20))  # ok | empty | error
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -134,6 +149,7 @@ class LibraryItem(Base):
     task_id: Mapped[str] = mapped_column(String(40))      # no FK on purpose
     stream_id: Mapped[str] = mapped_column(String(40), index=True)
     source_name: Mapped[str] = mapped_column(String(100))
+    public_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     quality: Mapped[str | None] = mapped_column(String(20), nullable=True)
     format: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # queued | downloading | ready | failed | expired | deleted

@@ -11,7 +11,7 @@ from ..db import get_db
 from ..downloader import cancel_download, start_download
 from ..fileutil import is_hls
 from ..library import item_to_out
-from ..models import ApiKey, LibraryItem, SourceRun, Stream, Task, as_utc, utcnow
+from ..models import ApiKey, LibraryItem, SourceRun, Stream, Task, as_utc, public_label, utcnow
 from ..resolver import is_expired
 from ..schemas import LibraryItemOut, LibraryRequest
 
@@ -73,7 +73,8 @@ async def request_library(task_id: str, body: LibraryRequest, request: Request, 
         return item_to_out(existing, _base(request))
 
     item = LibraryItem(api_key_id=key.id, task_id=task_id, stream_id=stream.id,
-                       source_name=run.source_name, quality=quality, format=stream.format,
+                       source_name=run.source_name, public_name=run.public_name or public_label(None, run.source_id),
+                       quality=quality, format=stream.format,
                        status="queued", ttl_hours=ttl)
     db.add(item)
     await db.commit()

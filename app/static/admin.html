@@ -483,22 +483,26 @@ async function viewKeys() {
 }
 
 /* ---------- library ---------- */
+const fmtEta = n => n == null ? '' : n < 60 ? `${n}s` : n < 3600 ? `${Math.round(n / 60)} min` : `${(n / 3600).toFixed(1)} h`;
 async function viewLibrary() {
   const items = await api('GET', '/library');
   if (S.view !== 'library') return;
   $('#main').innerHTML = `
-    <h2 class="title">Library</h2><p class="sub">Files downloaded to your server. They delete themselves when their time is up.</p>
-    <div class="card"><div class="tablewrap"><table><tr><th>File</th><th>Provider</th><th>Quality</th><th>Status</th><th style="min-width:130px">Progress</th><th>Size</th><th>Deletes</th><th></th></tr>
+    <h2 class="title">Library</h2><p class="sub">Files downloaded to your server. They delete themselves when their time is up. <b>HLS</b> items can be played while they are still downloading.</p>
+    <div class="card"><div class="tablewrap"><table><tr><th>File</th><th>Provider</th><th>Mode</th><th>Quality</th><th>Status</th><th style="min-width:130px">Progress</th><th>Speed</th><th>Size</th><th>Deletes</th><th></th></tr>
     ${items.map(i => {
       const pct = i.status === 'ready' ? 100 : i.total_bytes ? Math.min(99, Math.round((i.size || 0) / i.total_bytes * 100)) : 0;
       const live = ['ready', 'queued', 'downloading'].includes(i.status);
+      const hlsMode = i.mode === 'hls';
       return `<tr><td class="mono">${esc(i.id)}<div class="hint" style="margin:0">${esc(i.task_id)}</div></td>
-        <td><b>${esc(i.source)}</b><div class="hint" style="margin:0">shown as “${esc(i.public_name || '–')}”</div></td><td>${esc(i.quality || '–')}</td>
-        <td>${badge(i.status)}${i.error ? `<div class="hint" style="max-width:240px;color:var(--err)">${esc(i.error)}</div>` : ''}</td>
+        <td><b>${esc(i.source)}</b><div class="hint" style="margin:0">shown as “${esc(i.public_name || '–')}”</div></td>
+        <td>${hlsMode ? '<span class="badge info plain">HLS</span>' : '<span class="badge plain">file</span>'}</td><td>${esc(i.quality || '–')}</td>
+        <td>${badge(i.status)}${hlsMode && i.status !== 'failed' ? (i.playable ? ' <span class="badge ok">playable</span>' : ' <span class="badge warn plain">not yet</span>') : ''}${i.error ? `<div class="hint" style="max-width:240px;color:var(--err)">${esc(i.error)}</div>` : ''}</td>
         <td><div class="bar ${i.status === 'failed' ? 'err' : i.status === 'ready' ? 'ok' : ''}"><i style="width:${pct}%"></i></div><span class="hint">${pct}%</span></td>
+        <td>${i.download_speed != null ? `${bytes(i.download_speed)}/s<div class="hint" style="margin:0">${i.eta_seconds != null ? 'ETA ' + fmtEta(i.eta_seconds) : ''}</div>` : '–'}</td>
         <td>${bytes(i.size)}</td><td class="muted">${i.status === 'ready' ? when(i.delete_at) : '–'}</td>
         <td style="text-align:right">${live ? `<button class="btn danger sm" data-act="lib-del" data-id="${esc(i.id)}">${ico('trash')}</button>` : ''}</td></tr>`;
-    }).join('') || `<tr><td colspan="8">${empty('Nothing downloaded yet', 'Request a library download from the API and it will appear here.')}</td></tr>`}</table></div></div>`;
+    }).join('') || `<tr><td colspan="10">${empty('Nothing downloaded yet', 'Request a library download from the API and it will appear here.')}</td></tr>`}</table></div></div>`;
   if (items.some(i => ['queued', 'downloading'].includes(i.status))) S.timer = setTimeout(() => S.view === 'library' && run(viewLibrary), 3000);
 }
 

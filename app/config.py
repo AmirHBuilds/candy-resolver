@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     library_min_free_gb: int = 2         # keep this much disk free
     signed_url_ttl_min: int = 360        # lifetime of each signed file link
     ffmpeg_path: str = "ffmpeg"
+    ffprobe_path: str = "ffprobe"
+
+    # progressive HLS (play while downloading)
+    progressive_segment_seconds: int = 4   # length of each .ts segment (cut at keyframes, so can be longer)
+    progressive_min_segments: int = 3      # `playable` once this many segments are finished (~12s of video)
+    progressive_audio_bitrate: str = "128k"  # only used when audio has to be converted to aac
+    hls_link_ttl_min: int = 720            # lifetime of a stream_url: long enough for a whole movie
+    cors_origins: str = "*"                # origins allowed to fetch /h/ playlists+segments: "*", "", or "https://a.com,https://b.com"
     library_hls_timeout_min: int = 240   # give up on an HLS download after this long
 
     @property

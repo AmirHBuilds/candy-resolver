@@ -106,6 +106,8 @@ class LibraryRequest(BaseModel):
     stream_id: str
     ttl_hours: int | None = Field(default=None, ge=1, description="Auto-delete this many hours after the download finishes")
     quality: str | None = Field(default=None, description="HLS streams only: pick this quality (e.g. '720p'); default is the best")
+    progressive: bool = Field(default=False, description="true = download as HLS (playlist + segments) and give a stream_url "
+                                                        "that is playable while the download is still running")
 
 
 class LibraryItemOut(BaseModel):
@@ -124,5 +126,11 @@ class LibraryItemOut(BaseModel):
     requested_at: datetime
     ready_at: datetime | None
     delete_at: datetime | None
-    url: str | None            # signed link, only when status == "ready"
+    url: str | None            # signed link to the file, only for mode "file" when status == "ready"
     url_expires_at: datetime | None
+    mode: str = "file"                      # "file" or "hls" (progressive)
+    playable: bool = False                  # file: ready. hls: enough segments to start playing
+    stream_url: str | None = None           # hls: signed playlist URL, available as soon as `playable`
+    stream_url_expires_at: datetime | None = None
+    download_speed: int | None = None       # bytes/sec (smoothed ~8s); null unless status == "downloading"
+    eta_seconds: int | None = None          # null unless status == "downloading"

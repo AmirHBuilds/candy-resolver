@@ -32,7 +32,8 @@ async def _owned(db: AsyncSession, item_id: str, key: ApiKey) -> LibraryItem:
 @router.post("/tasks/{task_id}/library", response_model=LibraryItemOut, status_code=202)
 async def request_library(task_id: str, body: LibraryRequest, request: Request, response: Response,
                           key: ApiKey = Depends(require_api_key), db: AsyncSession = Depends(get_db)):
-    """Download one stream of a task to our server. Poll GET /v1/library/{id} until status is 'ready'."""
+    """Download one stream of a task to our server. Poll GET /v1/library/{id} until status is 'ready'.
+    With "progressive": true it is packaged as HLS and `stream_url` is playable while the download still runs."""
     task = await db.get(Task, task_id)
     if task is None or task.api_key_id != key.id:
         raise HTTPException(404, "task not found")
@@ -53,11 +54,13 @@ async def request_library(task_id: str, body: LibraryRequest, request: Request, 
     # For HLS the client may choose the quality; for plain files the stream's own quality label stands.
     quality = (body.quality or stream.quality) if is_hls(stream.format, stream.url) else stream.quality
 
-    # Same stream (and quality) already queued / downloading / ready -> reuse it, extend its time if asked.
+    mode = "hls" if body.progressive else "file"
+
+    # Same stream (and quality, and mode) already queued / downloading / ready -> reuse it, extend its time if asked.
     same_q = LibraryItem.quality.is_(None) if quality is None else LibraryItem.quality == quality
     existing = (await db.execute(
         select(LibraryItem)
-        .where(LibraryItem.stream_id == stream.id, LibraryItem.api_key_id == key.id, same_q,
+        .where(LibraryItem.stream_id == stream.id, LibraryItem.api_key_id == key.id, same_q, LibraryItem.mode == mode,
                LibraryItem.status.in_(["queued", "downloading", "ready"]))
         .order_by(LibraryItem.requested_at.desc()))).scalars().first()
     if existing and existing.status == "ready" and as_utc(existing.delete_at) <= utcnow():
@@ -74,7 +77,7 @@ async def request_library(task_id: str, body: LibraryRequest, request: Request, 
 
     item = LibraryItem(api_key_id=key.id, task_id=task_id, stream_id=stream.id,
                        source_name=run.source_name, public_name=run.public_name or public_label(None, run.source_id),
-                       quality=quality, format=stream.format,
+                       quality=quality, format=stream.format, mode=mode,
                        status="queued", ttl_hours=ttl)
     db.add(item)
     await db.commit()

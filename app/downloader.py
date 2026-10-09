@@ -1,5 +1,8 @@
-"""Downloads a stream into the library (our own disk) in the background.
-Plain files are streamed with httpx; HLS (m3u8) playlists are remuxed to mp4 with ffmpeg."""
+"""Downloads a stream into the library (our own disk) in the background. Three ways, chosen per item:
+  mode "file"  + plain URL   -> streamed with httpx into one file
+  mode "file"  + HLS source  -> remuxed to a single mp4 with ffmpeg (-c copy)
+  mode "hls"   (progressive) -> ffmpeg (-c copy) into a growing playlist + segments, playable while it downloads
+Video is never re-encoded anywhere."""
 import asyncio
 import os
 import shutil
@@ -8,12 +11,14 @@ from datetime import timedelta
 
 import httpx
 
-from . import hls
+from . import hls, speedmeter
 from .config import settings
 from .db import SessionLocal
 from .fileutil import is_hls, pick_ext
 from .models import LibraryItem, utcnow
+from .progressive import Params, ProgressiveError, Update, run_progressive
 from .runner import _kill, _read_capped
+from .speedmeter import SpeedMeter
 
 GB = 1024 ** 3
 MB = 1024 ** 2
@@ -55,8 +60,16 @@ def _limits():
     return settings.library_max_size_gb * GB, settings.library_min_free_gb * GB
 
 
+def _split_headers(hdrs: dict) -> tuple[dict, str]:
+    h = dict(hdrs)
+    ua = h.pop("User-Agent", "candyresolver/0.1")
+    h.pop("Accept-Encoding", None)
+    return h, ua
+
+
 async def _fetch_direct(db, item, url: str, hdrs: dict, part) -> int:
     max_bytes, reserve = _limits()
+    meter = SpeedMeter()
     async with httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(30.0, read=60.0)) as client:
         async with client.stream("GET", url, headers=hdrs) as r:
             r.raise_for_status()
@@ -76,6 +89,7 @@ async def _fetch_direct(db, item, url: str, hdrs: dict, part) -> int:
             with open(part, "wb") as f:
                 async for chunk in r.aiter_bytes(MB):
                     written += len(chunk)
+                    meter.add(written)
                     if written > max_bytes:
                         raise DownloadError("file exceeds the size limit")
                     if written - last_disk_check >= 64 * MB:
@@ -85,6 +99,7 @@ async def _fetch_direct(db, item, url: str, hdrs: dict, part) -> int:
                     await asyncio.to_thread(f.write, chunk)
                     if time.monotonic() - last_commit >= 2:
                         item.size = written
+                        speedmeter.publish(item.id, meter.speed(), meter.eta(total - written if total else None))
                         await db.commit()
                         last_commit = time.monotonic()
     if written == 0:
@@ -102,12 +117,9 @@ async def _get_text(client: httpx.AsyncClient, url: str) -> tuple[str, str]:
     return r.text, str(r.url)
 
 
-async def _fetch_hls(db, item, url: str, hdrs: dict, part) -> int:
-    max_bytes, reserve = _limits()
-    hdrs = dict(hdrs)
-    ua = hdrs.pop("User-Agent", "candyresolver/0.1")
-    hdrs.pop("Accept-Encoding", None)
-
+async def _resolve_hls(db, item, url: str, hdrs: dict, ua: str) -> tuple[str, str | None, float]:
+    """HLS source -> (media playlist url, separate audio playlist url or None, duration in seconds).
+    Picks the variant the client asked for (default: best). Refuses live / unfinished streams."""
     async with httpx.AsyncClient(follow_redirects=True, timeout=30.0, headers={"User-Agent": ua, **hdrs}) as c:
         text, video_url = await _get_text(c, url)
         audio_url = None
@@ -127,6 +139,14 @@ async def _fetch_hls(db, item, url: str, hdrs: dict, part) -> int:
     if info["duration"] <= 0:
         raise DownloadError("playlist has no segments")
     await db.commit()
+    return video_url, audio_url, info["duration"]
+
+
+async def _fetch_hls(db, item, url: str, hdrs: dict, part) -> int:
+    """HLS source -> one mp4 file (ffmpeg remux, no re-encoding)."""
+    max_bytes, reserve = _limits()
+    hdrs, ua = _split_headers(hdrs)
+    video_url, audio_url, duration = await _resolve_hls(db, item, url, hdrs, ua)
 
     cmd = hls.build_ffmpeg_cmd(settings.ffmpeg_path, video_url, audio_url, part, hdrs, ua)
     try:
@@ -135,7 +155,8 @@ async def _fetch_hls(db, item, url: str, hdrs: dict, part) -> int:
     except FileNotFoundError:
         raise DownloadError("ffmpeg is not installed on the server")
 
-    duration_us = info["duration"] * 1e6
+    duration_us = duration * 1e6
+    meter = SpeedMeter()
 
     async def progress():
         out_us = size = 0
@@ -143,9 +164,10 @@ async def _fetch_hls(db, item, url: str, hdrs: dict, part) -> int:
         async for raw in proc.stdout:
             key, _, val = raw.decode(errors="replace").strip().partition("=")
             if key in ("out_time_us", "out_time_ms") and val.lstrip("-").isdigit():
-                out_us = int(val)
+                out_us = max(out_us, int(val))
             elif key == "total_size" and val.isdigit():
                 size = int(val)
+                meter.add(size)
             elif key == "progress" and time.monotonic() - last_commit >= 2:
                 last_commit = time.monotonic()
                 if size > max_bytes:
@@ -155,6 +177,8 @@ async def _fetch_hls(db, item, url: str, hdrs: dict, part) -> int:
                 item.size = size
                 if out_us > 0:  # project the final size from how far along we are
                     item.total_bytes = max(size, int(size * duration_us / out_us))
+                speedmeter.publish(item.id, meter.speed(),
+                                   meter.eta(item.total_bytes - size if item.total_bytes else None))
                 await db.commit()
 
     try:
@@ -179,44 +203,85 @@ async def _fetch_hls(db, item, url: str, hdrs: dict, part) -> int:
     return written
 
 
+async def _fetch_progressive(db, item, url: str, hdrs: dict, dest_dir, source_is_hls: bool) -> int:
+    """Any source -> HLS playlist + segments in dest_dir, playable while it downloads."""
+    hdrs, ua = _split_headers(hdrs)
+    video_url, audio_url, duration = url, None, None
+    if source_is_hls:
+        video_url, audio_url, duration = await _resolve_hls(db, item, url, hdrs, ua)
+    max_bytes, reserve = _limits()
+    params = Params(
+        ffmpeg=settings.ffmpeg_path, ffprobe=settings.ffprobe_path,
+        segment_seconds=settings.progressive_segment_seconds, min_segments=settings.progressive_min_segments,
+        max_bytes=max_bytes, reserve_bytes=reserve, timeout_s=settings.library_hls_timeout_min * 60,
+        audio_bitrate=settings.progressive_audio_bitrate, free_bytes=_free_bytes)
+
+    async def on_update(u: Update) -> None:
+        item.size = max(item.size or 0, u.size)
+        if u.total_bytes:
+            item.total_bytes = max(u.total_bytes, item.size)
+        if u.playable:
+            item.playable = True
+        speedmeter.publish(item.id, u.speed, u.eta)
+        await db.commit()
+
+    try:
+        result = await run_progressive(video_url=video_url, audio_url=audio_url, source_is_hls=source_is_hls,
+                                       headers=hdrs, user_agent=ua, dest_dir=dest_dir, params=params,
+                                       on_update=on_update, known_duration=duration)
+    except ProgressiveError as e:
+        raise DownloadError(str(e))
+    return result["size"]
+
+
 async def _download(item_id: str, url: str, headers: dict | None, fmt: str | None) -> None:
     async with _semaphore():
-        async with SessionLocal() as db:
-            item = await db.get(LibraryItem, item_id)
-            if item is None or item.status != "queued":
-                return  # deleted before it started
-            item.status = "downloading"
-            await db.commit()
-
-            hls_mode = is_hls(fmt, url)
-            dest_dir = settings.library_path / item_id
-            part = dest_dir / "video.part"
-            final = dest_dir / ("video.mp4" if hls_mode else f"video.{pick_ext(fmt, url)}")
-            try:
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                hdrs = {"User-Agent": "candyresolver/0.1", "Accept-Encoding": "identity"}
-                hdrs.update({str(k): str(v) for k, v in (headers or {}).items()})
-
-                written = await (_fetch_hls if hls_mode else _fetch_direct)(db, item, url, hdrs, part)
-
-                os.replace(part, final)
-                now = utcnow()
-                item.status = "ready"
-                item.file_path = str(final)
-                item.format = final.suffix.lstrip(".")
-                item.size = item.total_bytes = written
-                item.ready_at = now
-                item.delete_at = now + timedelta(hours=item.ttl_hours)
-                await db.commit()
-            except asyncio.CancelledError:
-                shutil.rmtree(dest_dir, ignore_errors=True)  # the DELETE endpoint updates the row
-                raise
-            except Exception as e:
-                shutil.rmtree(dest_dir, ignore_errors=True)
-                await db.rollback()
+        try:
+            async with SessionLocal() as db:
                 item = await db.get(LibraryItem, item_id)
-                if item is not None:
-                    item.status = "failed"
-                    item.error = (str(e) or e.__class__.__name__)[:500]
-                    item.file_path = None
+                if item is None or item.status != "queued":
+                    return  # deleted before it started
+                item.status = "downloading"
+                await db.commit()
+
+                progressive = (item.mode or "file") == "hls"
+                source_is_hls = is_hls(fmt, url)
+                dest_dir = settings.library_path / item_id
+                part = dest_dir / "video.part"
+                final = dest_dir / ("video.mp4" if source_is_hls else f"video.{pick_ext(fmt, url)}")
+                try:
+                    dest_dir.mkdir(parents=True, exist_ok=True)
+                    hdrs = {"User-Agent": "candyresolver/0.1", "Accept-Encoding": "identity"}
+                    hdrs.update({str(k): str(v) for k, v in (headers or {}).items()})
+
+                    if progressive:
+                        written = await _fetch_progressive(db, item, url, hdrs, dest_dir, source_is_hls)
+                        item.file_path = str(dest_dir / hls.PLAYLIST_NAME)
+                        item.format = "hls"
+                        item.playable = True
+                    else:
+                        written = await (_fetch_hls if source_is_hls else _fetch_direct)(db, item, url, hdrs, part)
+                        os.replace(part, final)
+                        item.file_path = str(final)
+                        item.format = final.suffix.lstrip(".")
+                    now = utcnow()
+                    item.status = "ready"
+                    item.size = item.total_bytes = written
+                    item.ready_at = now
+                    item.delete_at = now + timedelta(hours=item.ttl_hours)
                     await db.commit()
+                except asyncio.CancelledError:
+                    shutil.rmtree(dest_dir, ignore_errors=True)  # the DELETE endpoint updates the row
+                    raise
+                except Exception as e:
+                    shutil.rmtree(dest_dir, ignore_errors=True)  # never leave a playlist that never ends
+                    await db.rollback()
+                    item = await db.get(LibraryItem, item_id)
+                    if item is not None:
+                        item.status = "failed"
+                        item.error = (str(e) or e.__class__.__name__)[:500]
+                        item.file_path = None
+                        item.playable = False
+                        await db.commit()
+        finally:
+            speedmeter.clear(item_id)

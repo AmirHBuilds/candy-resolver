@@ -7,6 +7,8 @@ COLUMNS = [
     ("sources", "public_name", "VARCHAR(100) NOT NULL DEFAULT ''"),
     ("source_runs", "public_name", "VARCHAR(100)"),
     ("library_items", "public_name", "VARCHAR(100)"),
+    ("library_items", "mode", "VARCHAR(10) NOT NULL DEFAULT 'file'"),
+    ("library_items", "playable", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("tasks", "version", "INTEGER NOT NULL DEFAULT 0"),
     ("tasks", "sources_total", "INTEGER NOT NULL DEFAULT 0"),
     ("tasks", "starred_total", "INTEGER NOT NULL DEFAULT 0"),

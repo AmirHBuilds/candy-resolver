@@ -154,6 +154,8 @@ class LibraryItem(Base):
     format: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # queued | downloading | ready | failed | expired | deleted
     status: Mapped[str] = mapped_column(String(20), default="queued")
+    mode: Mapped[str] = mapped_column(String(10), default="file")        # file = single mp4/mkv, hls = playlist + segments
+    playable: Mapped[bool] = mapped_column(Boolean, default=False)       # hls: enough segments exist to start playing
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)         # bytes so far / final

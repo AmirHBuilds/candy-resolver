@@ -19,4 +19,7 @@ def verify(item_id: str, exp, sig) -> bool:
         exp = int(exp)
     except (TypeError, ValueError):
         return False
-    return exp >= time.time() and hmac.compare_digest(_mac(item_id, exp), sig or "")
+    try:
+        return exp >= time.time() and hmac.compare_digest(_mac(item_id, exp), sig or "")
+    except TypeError:           # non-ASCII text in the signature
+        return False

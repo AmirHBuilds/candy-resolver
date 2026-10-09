@@ -32,7 +32,7 @@ async def serve_file(item_id: str, filename: str, request: Request,
     if not verify(item_id, exp, sig):
         raise HTTPException(403, "invalid or expired link")
     item = await db.get(LibraryItem, item_id)
-    if (item is None or item.status != "ready" or not item.file_path
+    if (item is None or (item.mode or "file") != "file" or item.status != "ready" or not item.file_path
             or as_utc(item.delete_at) <= utcnow()):
         raise HTTPException(404, "file not available")
     path = Path(item.file_path)

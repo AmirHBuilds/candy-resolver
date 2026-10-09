@@ -103,6 +103,51 @@ while (t.status === "pending" || t.status === "running") {
 - Long polling holds no database connection while waiting, and wakes instantly when a source finishes (with a once-a-second safety re-check).
 - Tasks that were running when the server stopped are marked `failed` on restart.
 
+## Progressive HLS: play while it downloads
+For a player on another site (e.g. CandyFlix): ask for `"progressive": true` and the server downloads the stream as **HLS (playlist + segments)**,
+so you get a `stream_url` after ~3 segments (~12 s of video) while the rest keeps downloading. Video is **never re-encoded** (`ffmpeg -c copy`).
+```bash
+# 1) request it (everything else about /library is unchanged; without "progressive" you still get the single-file download)
+curl -X POST localhost:8000/v1/tasks/tsk_.../library -H "X-API-Key: $K" -H Content-Type:application/json \
+     -d '{"stream_id":"str_...","progressive":true,"ttl_hours":24}'          # -> lib_..., mode "hls", status "queued"
+# 2) poll until "playable" is true (every GET returns a fresh signed stream_url)
+curl localhost:8000/v1/library/lib_... -H "X-API-Key: $K"
+# 3) give stream_url to the player once playable is true
+```
+```json
+{ "id": "lib_...", "mode": "hls", "status": "downloading", "playable": true, "progress": 0.31,
+  "size": 52000000, "total_bytes": 168000000, "download_speed": 4800000, "eta_seconds": 24,
+  "stream_url": "https://candy.example.com/h/lib_.../index.m3u8?exp=...&sig=...", "stream_url_expires_at": "...",
+  "url": null, "ttl_hours": 24, "delete_at": null }
+```
+New fields (on **every** library endpoint: POST/GET `/v1/tasks/{id}/library`, GET `/v1/library`, GET `/v1/library/{id}`):
+`mode` (`file`|`hls`), `playable`, `stream_url`, `stream_url_expires_at`, `download_speed` (bytes/s, smoothed over ~8 s) and `eta_seconds`
+(both `null` unless `status` is `downloading`). `url` is only used by `file` items; `stream_url` only by `hls` items. `progress` never goes backwards
+and is only 1.0 when `status` is `ready` (`ready` = ffmpeg finished cleanly **and** the playlist has `#EXT-X-ENDLIST`).
+`size`/`total_bytes` for HLS are the bytes of the segments (total is a projection until it is done).
+
+Player (hls.js) - **`startPosition: 0`** is needed because the playlist is still growing:
+```js
+const res = await fetch(`${BACKEND}/library/${id}`).then(r => r.json());     // your backend calls candyresolver with the API key
+if (res.playable) {
+  const hls = new Hls({ startPosition: 0 });
+  hls.loadSource(res.stream_url);
+  hls.attachMedia(video);
+}
+```
+While `status` is `downloading` the seek bar only reaches the part that is downloaded so far (hls.js keeps loading new segments as they appear);
+once `ready` the whole movie is seekable. Use `?exp&sig` links only for the player: they are bearer links (valid 12 h by default, never past the file's delete time).
+- **Sources:** plain mp4/mkv links and HLS (.m3u8) sources both work. Video must be **h264** (8-bit 4:2:0), otherwise the item fails with e.g. `unsupported video codec: hevc`.
+  Audio aac/mp3 is copied, anything else is converted to aac (cheap); subtitles and data streams are dropped.
+- **Failures:** if ffmpeg fails, the source is cut off early, the limit/disk reserve/timeout is hit or you DELETE the item: ffmpeg is killed, the whole folder is removed,
+  the item is `failed` with a short `error`, and its links stop working (no playlist that never ends).
+- **Reuse:** the same stream requested again (by anyone with the same key) reuses the running or finished download; a `file` and an `hls` download are separate.
+- **CORS:** `/h/...` answers `GET/HEAD/OPTIONS` with `Range` allowed and `Content-Length`, `Content-Range`, `Accept-Ranges` exposed. Set `CORS_ORIGINS=https://candyflix.example`
+  (default `*`; a comma-separated list or empty = no cross-origin access). `/f/...` never serves HLS items.
+- **Settings:** `PROGRESSIVE_SEGMENT_SECONDS` (4), `PROGRESSIVE_MIN_SEGMENTS` (3), `HLS_LINK_TTL_MIN` (720), `CORS_ORIGINS`, plus the existing
+  `LIBRARY_CONCURRENCY`, `LIBRARY_MAX_SIZE_GB`, `LIBRARY_MIN_FREE_GB` and `LIBRARY_HLS_TIMEOUT_MIN` which apply to progressive downloads too.
+- The growing playlist is sent with `Cache-Control: no-store`; segments are cacheable. Segments are cut at keyframes, so a source with rare keyframes gives longer segments.
+
 ## HLS (.m3u8) streams
 Return a stream with `"format": "hls"` (or a URL ending in `.m3u8`). In library mode the server remuxes it to a single **mp4 with ffmpeg**
 (no re-encoding, so it's fast and uses little CPU), including AES-128 encrypted playlists and separate audio tracks.
@@ -126,4 +171,4 @@ Not restricted: network access. (Bubblewrap / network policies can be added late
 - Rate limiting is in-memory (single worker). Tables are auto-created; switch to Alembic before changing the schema.
 - Settings: `LIBRARY_TTL_HOURS`, `LIBRARY_MAX_SIZE_GB`, `LIBRARY_CONCURRENCY`, ... (see `.env.example`).
 
-Tests: `python -m tests.smoke_runner`, `python -m tests.smoke_units`, `python -m tests.smoke_hls`, `python -m tests.smoke_waiting`
+Tests: `python -m tests.smoke_runner`, `python -m tests.smoke_units`, `python -m tests.smoke_hls`, `python -m tests.smoke_waiting`, `python -m tests.smoke_progressive`

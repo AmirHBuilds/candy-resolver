@@ -11,7 +11,7 @@ from .db import Base, engine
 from .migrate import migrate
 from .library import expire_library, fail_stuck_library, sweep_orphans
 from .resolver import fail_stuck_tasks, purge_expired
-from .routers import admin, files, library, resolve
+from .routers import admin, files, hls, library, resolve
 
 
 async def _cleanup_loop():
@@ -44,6 +44,7 @@ app = FastAPI(title="candyresolver", version="0.2.0", lifespan=lifespan)
 app.include_router(resolve.router)
 app.include_router(library.router)
 app.include_router(files.router)
+app.include_router(hls.router)
 app.include_router(admin.router)
 
 

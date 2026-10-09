@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from ..auth import generate_key, hash_key, require_admin
 from ..config import settings
 from ..db import get_db
+from .. import speedmeter
 from ..downloader import cancel_download
 from ..models import ApiKey, LibraryItem, Script, Source, SourceRun, Task
 from ..runner import ScriptError, run_script
@@ -234,7 +235,9 @@ async def admin_tasks(limit: int = 50, db: AsyncSession = Depends(get_db)):
 
 
 def library_dict(i: LibraryItem) -> dict:
-    return {"id": i.id, "task_id": i.task_id, "source": i.source_name, "public_name": i.public_name,
+    speed, eta = speedmeter.read(i.id) if i.status == "downloading" else (None, None)
+    return {"mode": i.mode or "file", "playable": bool(i.playable) or (i.status == "ready" and (i.mode or "file") == "file"),
+            "download_speed": speed, "eta_seconds": eta,"id": i.id, "task_id": i.task_id, "source": i.source_name, "public_name": i.public_name,
             "quality": i.quality,
             "format": i.format, "status": i.status, "error": i.error, "size": i.size,
             "total_bytes": i.total_bytes, "ttl_hours": i.ttl_hours, "requested_at": i.requested_at,

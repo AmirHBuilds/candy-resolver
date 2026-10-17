@@ -1,0 +1,86 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: &logs
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}   # logs can never fill the disk
+    environment:
+      POSTGRES_USER: candy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-candy_internal}   # db is not exposed outside this compose network
+      POSTGRES_DB: candyresolver
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U candy -d candyresolver"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build: .
+    restart: unless-stopped
+    logging: *logs
+    init: true               # reaps zombie Chromium/Xvfb processes
+    shm_size: "1gb"          # Chromium crashes with the default 64MB /dev/shm
+    mem_limit: ${API_MEM_LIMIT:-4g}   # real memory cap for the whole container (replaces per-script RLIMIT_AS)
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${PORT:-8000}:8000"   # BIND_ADDRESS=127.0.0.1 when a reverse proxy (HTTPS) is in front
+    environment:
+      DATABASE_URL: postgresql+asyncpg://candy:${POSTGRES_PASSWORD:-candy_internal}@db:5432/candyresolver
+      DATA_DIR: /data
+      HOSTCLEAN_DIR: /hostclean
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}            # empty -> generated on first start
+      SIGNING_SECRET: ${SIGNING_SECRET:-}      # empty -> generated on first start
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}    # e.g. https://candy.example.com
+      LIBRARY_TTL_HOURS: ${LIBRARY_TTL_HOURS:-24}
+      LIBRARY_MAX_SIZE_GB: ${LIBRARY_MAX_SIZE_GB:-20}
+      LIBRARY_CONCURRENCY: ${LIBRARY_CONCURRENCY:-2}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      SERVER_NAME: ${SERVER_NAME:-}
+      LIVE_ENABLED: ${LIVE_ENABLED:-true}
+      LIVE_MAX_SESSIONS: ${LIVE_MAX_SESSIONS:-10}
+      AUDIO_CONCURRENCY: ${AUDIO_CONCURRENCY:-2}               # simultaneous GET /v1/library/{id}/audio extractions
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}         # who may load progressive HLS from another domain, e.g. https://candyflix.example
+      HLS_LINK_TTL_MIN: ${HLS_LINK_TTL_MIN:-720}
+      PROGRESSIVE_SEGMENT_SECONDS: ${PROGRESSIVE_SEGMENT_SECONDS:-4}
+      PROGRESSIVE_MIN_SEGMENTS: ${PROGRESSIVE_MIN_SEGMENTS:-3}
+      TASK_TTL_HOURS: ${TASK_TTL_HOURS:-24}                  # how long a task's RESULTS (stream links) stay valid
+      TASK_RETENTION_DAYS: ${TASK_RETENTION_DAYS:-365}      # how long the task record is kept (0 = forever)
+      SUBTITLE_PACK_TTL_HOURS: ${SUBTITLE_PACK_TTL_HOURS:-168}
+      SUBTITLES_ENABLED: ${SUBTITLES_ENABLED:-true}
+      SUBTITLE_MAX_FILES: ${SUBTITLE_MAX_FILES:-30}
+      SUBTITLE_MAX_BYTES: ${SUBTITLE_MAX_BYTES:-2097152}
+      SUBTITLE_TIMEOUT_S: ${SUBTITLE_TIMEOUT_S:-15}
+      SUBTITLE_CONCURRENCY: ${SUBTITLE_CONCURRENCY:-4}
+      SUBTITLE_LANGS: ${SUBTITLE_LANGS:-}                 # e.g. en,fa  (empty = every language)
+      SUBTITLE_DEFAULT_LANG: ${SUBTITLE_DEFAULT_LANG:-}   # e.g. en     (empty = never mark a default track)
+      SUBTITLE_FFMPEG_FALLBACK: ${SUBTITLE_FFMPEG_FALLBACK:-true}
+      MAX_CONCURRENT_TASKS: ${MAX_CONCURRENT_TASKS:-2}     # tasks running at once; the rest wait in line (0 = unlimited)
+      MAX_QUEUED_TASKS: ${MAX_QUEUED_TASKS:-20}            # waiting tasks beyond this get HTTP 429
+      MAX_BROWSER_SCRIPTS: ${MAX_BROWSER_SCRIPTS:-1}       # browser (Chrome) source scripts at once, server-wide
+      HLS_SEND_CUSTOM_HEADERS: ${HLS_SEND_CUSTOM_HEADERS:-false}   # false = bare ffmpeg for HLS (works for most CDNs)
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      SCRIPT_CPU_SECONDS: ${SCRIPT_CPU_SECONDS:-300}
+      SCRIPT_RUN_AS_UID: "65534"
+      SCRIPT_RUN_AS_GID: "65534"
+    volumes:
+      - candy_data:/data      # secrets + downloaded library
+      - ./hostclean:/hostclean   # request/answer files for the host agent (scripts/host_cleanup.sh --install-agent): the app gets NO other access to the host
+      # To keep the library on a bigger disk, replace the line above with e.g.:
+      # - /mnt/bigdisk/candyresolver:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+volumes:
+  pgdata:
+  candy_data:

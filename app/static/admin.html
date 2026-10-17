@@ -1,0 +1,1387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>candyresolver admin</title>
+<style>
+:root{
+  --bg:#f4f5f8;--panel:#fff;--panel2:#f8f9fb;--text:#1a1d24;--muted:#6a7280;--line:#e4e7ed;
+  --accent:#e0316f;--accent-soft:#fde8f0;--accent-ink:#fff;
+  --ok:#14864a;--ok-bg:#e3f6ec;--warn:#a96a05;--warn-bg:#fdf1db;--err:#c4262e;--err-bg:#fde7e8;--info:#2457c5;--info-bg:#e6edfb;
+  --code:#f1f3f7;--shadow:0 1px 2px rgba(20,24,40,.06),0 4px 14px rgba(20,24,40,.05);--radius:12px
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#0f1115;--panel:#181b21;--panel2:#1d2128;--text:#e9ebf0;--muted:#8f98a8;--line:#2a2f39;
+  --accent:#f2569a;--accent-soft:#3a1a2a;--accent-ink:#17080f;
+  --ok:#4cc585;--ok-bg:#12301f;--warn:#e6b04c;--warn-bg:#352a10;--err:#ff7078;--err-bg:#3a1a1d;--info:#7aa2ff;--info-bg:#172544;
+  --code:#12151a;--shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.25)}}
+:root[data-theme=dark]{
+  --bg:#0f1115;--panel:#181b21;--panel2:#1d2128;--text:#e9ebf0;--muted:#8f98a8;--line:#2a2f39;
+  --accent:#f2569a;--accent-soft:#3a1a2a;--accent-ink:#17080f;
+  --ok:#4cc585;--ok-bg:#12301f;--warn:#e6b04c;--warn-bg:#352a10;--err:#ff7078;--err-bg:#3a1a1d;--info:#7aa2ff;--info-bg:#172544;
+  --code:#12151a;--shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.25)}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+.hidden{display:none!important}
+.muted{color:var(--muted)}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* layout */
+#app{display:grid;grid-template-columns:230px 1fr;min-height:100%}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.brand{font-weight:700;font-size:16px;padding:4px 10px 16px;display:flex;gap:8px;align-items:center}
+.brand b{color:var(--accent)}
+.nav{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;border:0;background:none;color:var(--muted);cursor:pointer;text-align:left;width:100%}
+.nav:hover{background:var(--bg);color:var(--text)}
+.nav.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.spacer{flex:1}
+#content{min-width:0}
+.topbar{display:none;align-items:center;gap:10px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:6}
+main{max-width:1180px;margin:0 auto;padding:26px 24px 60px}
+h2.title{margin:0 0 4px;font-size:22px}.sub{margin:0 0 22px;color:var(--muted)}
+@media(max-width:860px){
+  #app{grid-template-columns:1fr}
+  aside{position:fixed;left:0;top:0;bottom:0;width:240px;z-index:20;transform:translateX(-100%);transition:transform .2s;box-shadow:var(--shadow)}
+  aside.open{transform:none}
+  .topbar{display:flex}
+  main{padding:18px 14px 50px}
+}
+
+/* building blocks */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card h3{margin:0 0 12px;font-size:14px;display:flex;align-items:center;gap:8px}
+.card h3 small{font-weight:400;color:var(--muted)}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+.stat b{display:block;font-size:26px;line-height:1.1;margin-bottom:4px}.stat span{color:var(--muted);font-size:12.5px}
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid transparent;border-radius:9px;padding:8px 14px;cursor:pointer;font-weight:600;background:var(--accent);color:var(--accent-ink);white-space:nowrap}
+.btn:hover{filter:brightness(1.07)}.btn:disabled{opacity:.5;cursor:default;filter:none}
+.btn.ghost{background:var(--panel);border-color:var(--line);color:var(--text);font-weight:500}
+.btn.ghost:hover{background:var(--bg)}
+.btn.danger{background:var(--panel);border-color:var(--err);color:var(--err);font-weight:500}
+.btn.sm{padding:4px 10px;font-size:12.5px;border-radius:7px}
+.btn.icon{padding:7px}
+input[type=text],input[type=password],input[type=number],select,textarea{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;max-width:100%;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;background:var(--panel)}
+label.l{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 4px}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.form{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;background:var(--code);color:var(--muted)}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.badge.err{background:var(--err-bg);color:var(--err)}.badge.info{background:var(--info-bg);color:var(--info)}
+.badge.plain::before{display:none}
+.switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.switch input{appearance:none;width:36px;height:20px;border-radius:99px;background:var(--line);position:relative;cursor:pointer;transition:.15s;flex:none;border:0;padding:0}
+.switch input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.15s}
+.switch input:checked{background:var(--accent)}.switch input:checked::after{left:18px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;color:var(--muted);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.empty{text-align:center;color:var(--muted);padding:34px 10px}
+.empty b{display:block;color:var(--text);margin-bottom:4px}
+.bar{height:8px;background:var(--code);border-radius:99px;overflow:hidden;min-width:90px}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .3s}
+.bar.ok i{background:var(--ok)}.bar.warn i{background:var(--warn)}.bar.err i{background:var(--err)}
+.logbox{background:var(--code);border:1px solid var(--line);border-radius:9px;max-height:380px;min-height:60px;overflow:auto;padding:8px 10px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.logbox .ll{white-space:pre-wrap;word-break:break-word}.logbox .lt{color:var(--muted);margin-right:8px;user-select:none}
+.logbox .lr{color:var(--info)}.logbox .le{color:var(--err)}.logbox .lw{color:var(--muted);font-style:italic}
+.livedot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;animation:pulse 1s infinite}@keyframes pulse{50%{opacity:.25}}
+pre.out{background:var(--code);border-radius:9px;padding:12px;overflow:auto;max-height:380px;font-size:12px;margin:10px 0 0;white-space:pre-wrap;word-break:break-word}
+.keybox{background:var(--accent-soft);border:1px dashed var(--accent);border-radius:var(--radius);padding:14px;margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.keybox code{word-break:break-all;flex:1;min-width:240px}
+
+/* sources split */
+.split{display:grid;grid-template-columns:290px 1fr;gap:16px;align-items:start}
+@media(max-width:980px){.split{grid-template-columns:1fr}}
+.srcitem{display:block;width:100%;text-align:left;border:1px solid transparent;background:none;border-radius:10px;padding:10px 12px;cursor:pointer;margin-bottom:4px}
+.srcitem:hover{background:var(--bg)}.srcitem.sel{background:var(--accent-soft);border-color:var(--accent)}
+.srcitem .n{font-weight:600;display:flex;justify-content:space-between;gap:8px}
+.srcitem .m{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.srcrow{position:relative}.srcrow .srcitem{padding-right:44px}
+.starbtn{position:absolute;right:8px;top:9px;background:none;border:0;cursor:pointer;color:var(--muted);padding:5px;border-radius:7px;display:inline-flex}
+.starbtn:hover{background:var(--bg);color:#e6a700}.starbtn.on{color:#e6a700}.starbtn.on svg{fill:currentColor}
+.star-inline{color:#e6a700;fill:currentColor;width:14px;height:14px;vertical-align:-2px;margin-right:4px}
+.vers{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chip{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:3px 10px;font-size:12.5px;cursor:pointer}
+.chip.sel{border-color:var(--accent);color:var(--accent);font-weight:700}
+.editor{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--code);height:430px}
+.editor pre{margin:0;padding:12px 8px 12px 10px;min-width:42px;text-align:right;color:var(--muted);user-select:none;overflow:hidden;border-right:1px solid var(--line);background:var(--panel2)}
+.editor pre,.editor textarea{font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.editor textarea{flex:1;border:0;border-radius:0;background:transparent;padding:12px;resize:none;white-space:pre;overflow:auto;tab-size:4;outline:0!important}
+.dirty{color:var(--warn);font-size:12.5px;font-weight:600}
+
+/* tasks */
+details.task{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--panel)}
+details.task summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+details.task summary::-webkit-details-marker{display:none}
+details.task[open] summary{border-bottom:1px solid var(--line)}
+details.task .body{padding:12px 14px}
+.run{display:grid;grid-template-columns:minmax(140px,220px) 1fr;gap:6px 14px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.run:last-child{border:0}
+
+/* feedback */
+#toast{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:60}
+.t{background:var(--text);color:var(--bg);padding:10px 14px;border-radius:10px;max-width:380px;box-shadow:var(--shadow);animation:in .15s}
+.t.err{background:var(--err);color:#fff}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}
+#modal{position:fixed;inset:0;background:rgba(10,12,18,.55);display:flex;align-items:center;justify-content:center;z-index:70;padding:16px}
+#modal .box{background:var(--panel);border-radius:14px;padding:22px;width:420px;max-width:100%;box-shadow:var(--shadow)}
+#modal h4{margin:0 0 8px;font-size:16px}#modal p{margin:0 0 18px;color:var(--muted)}
+#modal .actions{justify-content:flex-end;margin:0}
+#login{min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px}
+#login .card{width:360px;max-width:100%;padding:26px}
+.skeleton{height:90px;border-radius:12px;background:linear-gradient(90deg,var(--panel) 25%,var(--panel2) 50%,var(--panel) 75%);background-size:200% 100%;animation:sk 1.2s infinite;margin-bottom:14px}
+@keyframes sk{to{background-position:-200% 0}}
+/* panel additions */
+aside{overflow-y:auto}
+.statx .bar{margin-top:8px}.statx .hint{margin-top:5px}
+svg.spark{width:100%;height:64px;display:block}
+.spark .a{fill:var(--accent-soft);stroke:none}.spark .l{fill:none;stroke:var(--accent);stroke-width:1.6;vector-effect:non-scaling-stroke}
+.spark.ok .l{stroke:var(--ok)}.spark.ok .a{fill:var(--ok-bg)}.spark.info .l{stroke:var(--info)}.spark.info .a{fill:var(--info-bg)}.spark.warn .l{stroke:var(--warn)}.spark.warn .a{fill:var(--warn-bg)}
+.chart .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}.chart .top b{font-size:20px}.chart .top span{color:var(--muted);font-size:12.5px}
+.logbox{background:var(--code);border-radius:9px;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:auto;padding:8px 10px}
+.logline{white-space:pre-wrap;word-break:break-word}
+.logline .ts{color:var(--muted)}.logline .lg{color:var(--info)}
+.logline.lv-ERROR,.logline.lv-CRITICAL{color:var(--err)}.logline.lv-WARNING{color:var(--warn)}.logline.lv-DEBUG{color:var(--muted)}
+.chk{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line)}.chk:last-child{border:0}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none}.dot.ok{background:var(--ok)}.dot.bad{background:var(--err)}
+.fileexp>td{background:var(--panel2)}
+.core{display:grid;grid-template-columns:44px 1fr 46px;gap:8px;align-items:center;margin:4px 0;font-size:12px;color:var(--muted)}
+.kv{display:grid;grid-template-columns:minmax(120px,200px) 1fr;gap:6px 14px}.kv div:nth-child(odd){color:var(--muted)}
+.maint{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}
+.maint .m{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--panel2);display:flex;flex-direction:column;gap:8px;justify-content:space-between}
+</style>
+</head>
+<body>
+
+<div id="login" class="hidden">
+  <div class="card">
+    <div class="brand" style="padding-left:0"><span>🍬</span><span>candy<b>resolver</b></span></div>
+    <label class="l" for="tok">Admin token</label>
+    <input id="tok" type="password" autocomplete="current-password" placeholder="paste your admin token">
+    <p id="loginErr" style="color:var(--err);min-height:20px;margin:8px 0"></p>
+    <button class="btn" style="width:100%;justify-content:center" data-act="login">Sign in</button>
+    <p class="hint">Printed in the server log on first start, or run <span class="mono">start.bat</span> / <span class="mono">start.sh</span> again to see it.</p>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <aside id="side">
+    <div class="brand"><span>🍬</span><span>candy<b>resolver</b></span></div>
+    <button class="nav" data-act="nav" data-v="overview"></button>
+    <button class="nav" data-act="nav" data-v="sources"></button>
+    <button class="nav" data-act="nav" data-v="keys"></button>
+    <button class="nav" data-act="nav" data-v="library"></button>
+    <button class="nav" data-act="nav" data-v="files"></button>
+    <button class="nav" data-act="nav" data-v="tasks"></button>
+    <button class="nav" data-act="nav" data-v="logs"></button>
+    <button class="nav" data-act="nav" data-v="system"></button>
+    <button class="nav" data-act="nav" data-v="telegram"></button>
+    <button class="nav" data-act="nav" data-v="settings"></button>
+    <div class="spacer"></div>
+    <a class="nav" href="/docs" target="_blank" style="text-decoration:none" id="docsLink"></a>
+    <button class="nav" data-act="theme" id="themeBtn"></button>
+    <button class="nav" data-act="logout" id="outBtn"></button>
+  </aside>
+  <div id="content">
+    <div class="topbar"><button class="btn ghost icon" data-act="menu" id="menuBtn"></button><b>🍬 candyresolver</b></div>
+    <main id="main"></main>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="modal" class="hidden"></div>
+
+<script>
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const ICONS = {
+  overview:'<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>',
+  sources:'<path d="M12 22v-5"/><path d="M9 7V2"/><path d="M15 7V2"/><path d="M6 13V8h12v5a6 6 0 0 1-12 0z"/>',
+  keys:'<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="m17 6 3 3"/>',
+  library:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  tasks:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  telegram:'<path d="m22 2-11 11"/><path d="M22 2 15 22l-4-9-9-4z"/>',
+  docs:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
+  download:'<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>', upload:'<path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M5 21h14"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', copy:'<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>', play:'<path d="m6 3 14 9-14 9z"/>',
+  save:'<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
+  star:'<polygon points="12 2 15.1 8.6 22 9.3 17 14.1 18.2 21 12 17.7 5.8 21 7 14.1 2 9.3 8.9 8.6 12 2"/>',
+  files:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  logs:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/>',
+  system:'<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+  menu:'<path d="M3 6h18M3 12h18M3 18h18"/>', refresh:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
+};
+const ico = n => `<svg class="i" viewBox="0 0 24 24">${ICONS[n] || ''}</svg>`;
+const starIcon = () => `<svg class="i star-inline" viewBox="0 0 24 24" title="Starred">${ICONS.star}</svg>`;
+const LABELS = {overview:'Overview', sources:'Sources', keys:'API keys', library:'Library', files:'Files on disk', tasks:'Tasks', logs:'Logs', system:'System', telegram:'Telegram', settings:'Settings'};
+
+const S = {
+  token: sessionStorage.getItem('cr_admin') || '', view: 'overview', timer: null,
+  sources: [], selected: null, scripts: [], curVer: null, loadedCode: '', examples: null,
+  newKey: null, openTasks: new Set(), srcFilter: '',
+  cleanups: [], lv: null, libItems: [], libQ: '', libSt: '', files: null, fq: '', fOrph: false, fOpen: new Set(), fileLists: {},
+};
+
+/* ---------- helpers ---------- */
+function toast(msg, kind) {
+  const d = document.createElement('div');
+  d.className = 't' + (kind === 'err' ? ' err' : '');
+  d.textContent = msg;
+  $('#toast').appendChild(d);
+  setTimeout(() => d.remove(), kind === 'err' ? 7000 : 2600);
+}
+async function api(method, path, body) {
+  const r = await fetch('/admin' + path, {
+    method, headers: {'X-Admin-Token': S.token, 'Content-Type': 'application/json'},
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (r.status === 401) { signOut(); throw new Error('Invalid admin token'); }
+  if (!r.ok) {
+    let m = r.statusText || ('HTTP ' + r.status);
+    try { const j = await r.json(); m = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail); } catch (e) {}
+    throw new Error(m);
+  }
+  return r.status === 204 ? null : r.json();
+}
+const run = async fn => { try { return await fn(); } catch (e) { toast(e.message || String(e), 'err'); } };
+const bytes = n => {
+  if (n == null) return '–';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; n = Number(n);
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return n.toFixed(n >= 100 || i === 0 ? 0 : 1) + ' ' + u[i];
+};
+const when = s => s ? new Date(s).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}) : '–';
+const ago = s => {
+  if (!s) return '–';
+  const d = (Date.now() - new Date(s)) / 1000;
+  if (d < 60) return 'just now'; if (d < 3600) return Math.floor(d / 60) + ' min ago';
+  if (d < 86400) return Math.floor(d / 3600) + ' h ago'; return Math.floor(d / 86400) + ' d ago';
+};
+const BADGE = {ok:'ok', done:'ok', ready:'ok', empty:'warn', running:'info', queued:'warn', downloading:'info', pending:'warn',
+  failed:'err', error:'err', expired:'', deleted:''};
+const badge = (s, label) => `<span class="badge ${BADGE[s] ?? 'err'}">${esc(label || s)}</span>`;
+const empty = (t, d) => `<div class="empty"><b>${esc(t)}</b>${esc(d || '')}</div>`;
+const pubName = s => s.public_name || `Server ${s.id}`;
+const skeleton = () => { $('#main').innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>'; };
+
+function modal({title, text, ok = 'OK', danger = false, cancel = 'Cancel'}) {
+  return new Promise(res => {
+    const m = $('#modal');
+    m.innerHTML = `<div class="box"><h4>${esc(title)}</h4><p>${esc(text)}</p><div class="actions">
+      ${cancel ? `<button class="btn ghost" data-m="0">${esc(cancel)}</button>` : ''}
+      <button class="btn" style="${danger ? 'background:var(--err);color:#fff' : ''}" data-m="1">${esc(ok)}</button></div></div>`;
+    m.classList.remove('hidden');
+    const done = v => { m.classList.add('hidden'); m.onclick = null; document.removeEventListener('keydown', onKey); res(v); };
+    const onKey = e => { if (e.key === 'Escape') done(false); };
+    document.addEventListener('keydown', onKey);
+    m.onclick = e => { const b = e.target.closest('[data-m]'); if (b) done(b.dataset.m === '1'); else if (e.target === m) done(false); };
+    $('[data-m="1"]', m).focus();
+  });
+}
+const isDirty = () => { const c = $('#code'); return !!c && c.value !== S.loadedCode; };
+async function canLeave() {
+  if (!isDirty()) return true;
+  return modal({title: 'Discard unsaved changes?', text: 'The script in the editor has changes that are not saved as a version.', ok: 'Discard', danger: true});
+}
+window.addEventListener('beforeunload', e => { if (isDirty()) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('error', e => toast('Error: ' + e.message, 'err'));
+window.addEventListener('unhandledrejection', e => toast(e.reason?.message || String(e.reason), 'err'));
+
+/* ---------- shell / auth ---------- */
+function paintShell() {
+  $$('.nav[data-v]').forEach(b => { b.innerHTML = ico(b.dataset.v) + `<span>${LABELS[b.dataset.v]}</span>`; });
+  $('#docsLink').innerHTML = ico('docs') + '<span>API docs</span>';
+  $('#themeBtn').innerHTML = ico('sun') + '<span>Theme</span>';
+  $('#outBtn').innerHTML = ico('out') + '<span>Sign out</span>';
+  $('#menuBtn').innerHTML = ico('menu');
+}
+function showApp(on) {
+  $('#login').classList.toggle('hidden', on);
+  $('#app').classList.toggle('hidden', !on);
+}
+function signOut() {
+  S.token = ''; sessionStorage.removeItem('cr_admin'); clearTimeout(S.timer); S.cleanups.splice(0).forEach(f => f());
+  $('#tok').value = ''; showApp(false);
+}
+async function go(v) {
+  if (!(await canLeave())) return;
+  S.view = v; clearTimeout(S.timer); S.cleanups.splice(0).forEach(f => f()); S.lv = null; $('#side').classList.remove('open');
+  $$('.nav[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  skeleton();
+  await run(() => ({overview: viewOverview, sources: viewSources, keys: viewKeys, library: viewLibrary, files: viewFiles, tasks: viewTasks, logs: viewLogs, system: viewSystem, telegram: viewTelegram, settings: viewSettings})[v]());
+}
+function applyTheme(t) {
+  if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+}
+applyTheme(localStorage.getItem('cr_theme'));
+
+/* ---------- live helpers (charts, stat cards, log viewer) ---------- */
+const fmtUp = s => { s = Math.floor(s); const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m ${s % 60}s`; };
+const pctCls = p => p > 90 ? 'err' : p > 75 ? 'warn' : '';
+function spark(vals, max, cls = '') {
+  if (!vals.length) return '<svg class="spark" viewBox="0 0 300 64"></svg>';
+  const w = 300, h = 64, m = max || Math.max(...vals, 1);
+  const pts = vals.map((v, i) => [(i / Math.max(vals.length - 1, 1) * w).toFixed(1), (h - 3 - Math.min(v, m) / m * (h - 8)).toFixed(1)]);
+  const line = 'M' + pts.map(p => p.join(',')).join(' L');
+  return `<svg class="spark ${cls}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path class="a" d="${line} L${w},${h} L0,${h} Z"/><path class="l" d="${line}"/></svg>`;
+}
+const statCard = (title, big, sub, pct) => `<div class="stat statx"><b>${big}</b><span>${esc(title)}</span>
+  ${pct != null ? `<div class="bar ${pctCls(pct)}"><i style="width:${Math.min(100, pct)}%"></i></div>` : ''}<div class="hint">${sub}</div></div>`;
+const chartCard = (title, now, sub, svg) => `<div class="card chart" style="margin:0"><div class="top"><span>${esc(title)}</span><b>${now}</b></div>${svg}<div class="hint">${sub}</div></div>`;
+
+function fillLive(s, h, statsEl, chartsEl) {
+  const pts = h.points || [], mem = s.memory, mc = mem.container;
+  const memPct = mc ? mc.percent : mem.percent, memUsed = mc ? mc.used : mem.used, memTot = mc ? mc.limit : mem.total;
+  const errs = s.logs?.errors || 0;
+  $(statsEl).innerHTML =
+    statCard('CPU', s.cpu.percent + '%', `${s.host.cores} cores${s.host.cpu_limit_cores ? ' · limit ' + s.host.cpu_limit_cores : ''}${s.host.load ? ' · load ' + s.host.load.join(' ') : ''}`, s.cpu.percent) +
+    statCard('Memory' + (mc ? ' (container)' : ''), memPct + '%', `${bytes(memUsed)} of ${bytes(memTot)}${mem.swap_total ? ' · swap ' + bytes(mem.swap_used) : ''}`, memPct) +
+    statCard('Disk (library volume)', s.disk.percent + '%', `${bytes(s.disk.free)} free of ${bytes(s.disk.total)}`, s.disk.percent) +
+    statCard('Network', `↓ ${bytes(s.network.rx_per_s)}/s`, `↑ ${bytes(s.network.tx_per_s)}/s upload`, null) +
+    statCard('Resolver processes', s.app.procs, `CPU ${s.app.cpu}% · RAM ${bytes(s.app.rss)} · ${s.downloads_running} download(s) running`, null) +
+    (s.queue ? statCard('Tasks running', `${s.queue.tasks_running}${s.queue.task_limit ? ' / ' + s.queue.task_limit : ''}`,
+      `${s.queue.tasks_waiting} waiting${s.queue.task_limit ? ' (max ' + s.queue.queue_cap + ')' : ''} · browser scripts ${s.queue.browser_running}${s.queue.browser_limit ? ' / ' + s.queue.browser_limit : ''}${s.queue.browser_waiting ? ', ' + s.queue.browser_waiting + ' waiting' : ''}`,
+      s.queue.task_limit ? s.queue.tasks_running / s.queue.task_limit * 100 : null) : '') +
+    statCard('Uptime', fmtUp(s.uptime_s), `Python ${esc(s.host.python)} · pid ${s.app.pid}`, null) +
+    `<div class="stat statx" style="cursor:pointer" data-act="nav" data-v="logs"><b style="color:${errs ? 'var(--err)' : 'var(--ok)'}">${errs}</b><span>errors in the last hour</span><div class="hint">${s.logs?.warnings || 0} warnings · click to open logs</div></div>`;
+  const last = a => a.length ? a[a.length - 1] : 0;
+  const cpu = pts.map(p => p.cpu), mm = pts.map(p => p.mem), rx = pts.map(p => p.rx), tx = pts.map(p => p.tx), ac = pts.map(p => p.app_cpu), ar = pts.map(p => p.app_rss);
+  const span = pts.length > 1 ? Math.round((pts[pts.length - 1].ts - pts[0].ts) / 60) : 0;
+  const note = `last ${span || '<1'} min`;
+  $(chartsEl).innerHTML =
+    chartCard('CPU', last(cpu) + '%', note, spark(cpu, 100)) +
+    chartCard('Memory', last(mm) + '%', note, spark(mm, 100, 'info')) +
+    chartCard('Download speed', bytes(last(rx)) + '/s', note, spark(rx, 0, 'ok')) +
+    chartCard('Upload speed', bytes(last(tx)) + '/s', note, spark(tx, 0, 'warn')) +
+    chartCard('Resolver CPU (ffmpeg, Chrome…)', last(ac) + '%', note, spark(ac, 0)) +
+    chartCard('Resolver RAM', bytes(last(ar)), note, spark(ar, 0, 'info'));
+}
+
+/* live log viewer: polls /admin/logs, keeps scroll at the bottom unless you scroll up */
+function mountLog(el, {height = 340, compact = false} = {}) {
+  const st = {lines: [], last: 0, level: 'DEBUG', q: '', paused: false, dead: false, timer: null};
+  el.innerHTML = `<div class="toolbar" style="margin-bottom:8px">
+      <select data-lv="level" style="width:auto"><option value="DEBUG">All levels</option><option value="INFO">Info+</option><option value="WARNING">Warnings+</option><option value="ERROR">Errors only</option></select>
+      <input type="text" data-lv="q" placeholder="Filter text…" style="flex:1;min-width:140px">
+      <label class="switch"><input type="checkbox" data-lv="pause"><span>Pause</span></label>
+      ${compact ? '' : `<button class="btn ghost sm" data-act="logs-download">Download .txt</button><button class="btn danger sm" data-act="logs-clear">Clear</button>`}
+      <span class="muted" data-lv="count"></span></div>
+    <div class="logbox" style="height:${height}px"></div>`;
+  const box = $('.logbox', el);
+  const fmt = l => {
+    const d = new Date(l.ts * 1000);
+    return `<div class="logline lv-${esc(l.level)}"><span class="ts">${d.toLocaleTimeString([], {hour12: false})}</span> <span class="lg">${esc(l.logger)}</span> ${esc(l.msg)}</div>`;
+  };
+  const paint = (lines, replace) => {
+    const stick = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+    box.querySelector('.nolog')?.remove();
+    if (replace) box.innerHTML = '';
+    box.insertAdjacentHTML('beforeend', lines.map(fmt).join(''));
+    while (box.childElementCount > 1500) box.firstElementChild.remove();
+    if (stick || replace) box.scrollTop = box.scrollHeight;
+    $('[data-lv=count]', el).textContent = st.lines.length + ' lines';
+    if (!st.lines.length) box.innerHTML = '<div class="muted nolog">Nothing logged yet.</div>';
+  };
+  async function poll(reset) {
+    if (st.dead) return;
+    try {
+      if (reset) { st.lines = []; st.last = 0; }
+      if (!st.paused || reset) {
+        const r = await api('GET', `/logs?level=${st.level}&q=${encodeURIComponent(st.q)}&since_id=${st.last}&limit=${compact ? 120 : 800}`);
+        if (r.last_id < st.last) { st.lines = []; st.last = 0; reset = true; }   // buffer was cleared
+        if (r.lines.length || reset) { st.lines = st.lines.concat(r.lines).slice(-3000); paint(r.lines, reset); }
+        st.last = r.last_id;
+      }
+    } catch (e) { /* transient: try again next tick */ }
+    if (!st.dead) st.timer = setTimeout(() => poll(false), 2000);
+  }
+  el.addEventListener('change', e => {
+    const t = e.target.dataset.lv;
+    if (t === 'level') { st.level = e.target.value; clearTimeout(st.timer); poll(true); }
+    if (t === 'pause') st.paused = e.target.checked;
+  });
+  let deb; el.addEventListener('input', e => {
+    if (e.target.dataset.lv !== 'q') return;
+    st.q = e.target.value; clearTimeout(deb); deb = setTimeout(() => { clearTimeout(st.timer); poll(true); }, 300);
+  });
+  S.cleanups.push(() => { st.dead = true; clearTimeout(st.timer); });
+  poll(true);
+  return st;
+}
+
+/* ---------- overview ---------- */
+/* ---------- refresh button + auto refresh (Overview and System) ---------- */
+const REFRESH_OPTS = [[0, 'Off'], [2, '2 s'], [5, '5 s'], [10, '10 s'], [30, '30 s'], [60, '1 min']];
+const refreshSecs = () => { const v = localStorage.getItem('cr_refresh'); return v === null ? 5 : (+v || 0); };
+function refreshBar() {
+  return `<div class="toolbar" style="margin:0 0 14px;gap:12px"><button class="btn ghost sm" data-act="page-refresh">${ico('refresh')} Refresh</button>
+    <label class="muted" style="display:flex;align-items:center;gap:6px">Auto refresh <select id="arSel">${REFRESH_OPTS.map(([v, l]) => `<option value="${v}" ${v === refreshSecs() ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <span class="muted" id="arInfo"></span></div>`;
+}
+function arStamp() { const e = $('#arInfo'); if (e) e.textContent = 'updated ' + new Date().toLocaleTimeString(); }
+function scheduleRefresh() {
+  clearTimeout(S.timer);
+  const s = refreshSecs();
+  if (s > 0 && (S.view === 'overview' || S.view === 'system')) S.timer = setTimeout(autoTick, s * 1000);
+}
+async function autoTick() {
+  const v = S.view;
+  try { if (!document.hidden) { if (v === 'overview') await refreshOverview(false); else if (v === 'system') await refreshSystem(false); } } catch (e) { /* try again next time */ }
+  if (S.view === v) scheduleRefresh();
+}
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'arSel') { localStorage.setItem('cr_refresh', e.target.value); scheduleRefresh(); }
+});
+
+/* ---------- overview ---------- */
+const ovBanner = checks => {
+  const bad = checks.filter(c => !c.ok);
+  return bad.length ? `<div class="card" style="border-color:var(--err)"><h3 style="color:var(--err)">${bad.length} problem${bad.length > 1 ? 's' : ''} found</h3>${bad.map(c => `<div class="chk"><span class="dot bad"></span><div><b>${esc(c.name)}</b><div class="hint" style="margin:0">${esc(c.detail)}</div></div></div>`).join('')}</div>` : '';
+};
+const ovCounts = o => {
+  const lib = o.library || {};
+  return `<div class="grid">
+      <div class="stat"><b>${o.sources_enabled}<span style="font-size:15px;font-weight:400"> / ${o.sources_total}</span></b><span>sources enabled</span></div>
+      <div class="stat"><b>${o.api_keys}</b><span>API keys</span></div>
+      <div class="stat"><b>${o.tasks}</b><span>tasks stored</span></div>
+      <div class="stat" style="cursor:pointer" data-act="nav" data-v="files"><b>${lib.ready || 0}</b><span>files in library · ${bytes(o.library_bytes)}</span></div>
+      <div class="stat"><b>${(lib.queued || 0) + (lib.downloading || 0)}</b><span>downloads in progress</span></div>
+      <div class="stat"><b style="color:${lib.failed ? 'var(--err)' : 'inherit'}">${lib.failed || 0}</b><span>failed downloads</span></div>
+    </div>`;
+};
+const ovBottom = (tasks, checks) => {
+  const health = {};
+  tasks.forEach(t => t.runs.forEach(r => {
+    const h = health[r.source] ||= {name: r.source, pub: r.public_name, starred: r.starred, runs: 0, ok: 0, empty: 0, err: 0, ms: 0, last: null};
+    h.runs++; h.ms += r.duration_ms || 0;
+    if (r.status === 'ok') h.ok++; else if (r.status === 'empty') h.empty++; else { h.err++; h.last ||= r.error; }
+  }));
+  const rows = Object.values(health).sort((a, b) => b.runs - a.runs);
+  return `<div class="card"><h3>Source health <small>last ${tasks.length} tasks</small></h3>
+      ${rows.length ? `<div class="tablewrap"><table><tr><th>Source</th><th>Runs</th><th>Success</th><th>Avg time</th><th>Last error</th></tr>
+      ${rows.map(h => { const okp = Math.round((h.ok + h.empty) / h.runs * 100); return `<tr>
+        <td><b>${h.starred ? starIcon() : ''}${esc(h.name)}</b><div class="hint" style="margin:0">shown as “${esc(h.pub || '–')}”</div></td><td>${h.runs}</td>
+        <td style="min-width:140px"><div class="bar ${okp < 50 ? 'err' : okp < 90 ? 'warn' : 'ok'}"><i style="width:${okp}%"></i></div><span class="hint">${okp}% · ${h.empty} found nothing</span></td>
+        <td>${Math.round(h.ms / h.runs)} ms</td><td class="mono" style="max-width:300px">${esc((h.last || '').slice(-120)) || '–'}</td></tr>`; }).join('')}
+      </table></div>` : empty('No data yet', 'Run a resolve request and each source\'s results will show up here.')}</div>
+    <div class="card"><h3>Recent tasks</h3>${tasks.length ? tasks.slice(0, 5).map(taskCard).join('') : empty('No tasks yet')}</div>
+    <div class="card"><h3>Checks <small>what the resolver needs to work</small></h3>${checksHtml(checks)}</div>`;
+};
+async function viewOverview() {
+  const [o, tasks, checks] = await Promise.all([api('GET', '/overview'), api('GET', '/tasks?limit=50'), api('GET', '/checks')]);
+  if (S.view !== 'overview') return;
+  S.checks = checks; S.checksAt = Date.now();
+  $('#main').innerHTML = `
+    <h2 class="title">Overview</h2><p class="sub">What's going on in your resolver right now. Press Refresh, or choose how often it updates itself.</p>
+    ${refreshBar()}
+    <div id="ovBanner">${ovBanner(checks)}</div>
+    <div class="grid" id="ovStats"></div>
+    <div class="grid" id="ovCharts" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))"></div>
+    <div id="ovCounts">${ovCounts(o)}</div>
+    <div class="card"><h3>Live log <small><a href="#" data-act="nav" data-v="logs" style="color:var(--accent)">open full logs →</a></small></h3><div id="ovLog"></div></div>
+    <div id="ovBottom">${ovBottom(tasks, checks)}</div>`;
+  bindTaskToggles();
+  S.lv = mountLog($('#ovLog'), {height: 260, compact: true});
+  await refreshOverviewLive();
+  arStamp(); scheduleRefresh();
+}
+/* manual = the Refresh button: also re-reads the checks (otherwise they are re-read at most every 30 s) */
+async function refreshOverview(manual) {
+  if (S.view !== 'overview') return;
+  const wantChecks = manual || Date.now() - (S.checksAt || 0) > 30000;
+  const [o, tasks, checks] = await Promise.all([api('GET', '/overview'), api('GET', '/tasks?limit=50'), wantChecks ? api('GET', '/checks') : Promise.resolve(S.checks)]);
+  if (S.view !== 'overview' || !$('#ovBottom')) return;
+  if (wantChecks) { S.checks = checks; S.checksAt = Date.now(); }
+  $('#ovBanner').innerHTML = ovBanner(S.checks); $('#ovCounts').innerHTML = ovCounts(o); $('#ovBottom').innerHTML = ovBottom(tasks, S.checks);
+  bindTaskToggles();
+  await refreshOverviewLive();
+  arStamp();
+}
+async function refreshOverviewLive() {
+  if (S.view !== 'overview') return;
+  try {
+    const [s, h] = await Promise.all([api('GET', '/system'), api('GET', '/system/history?n=120')]);
+    if (S.view === 'overview' && $('#ovStats')) fillLive(s, h, '#ovStats', '#ovCharts');
+  } catch (e) { /* retry on the next tick */ }
+}
+const checksHtml = checks => checks.map(c => `<div class="chk"><span class="dot ${c.ok ? 'ok' : 'bad'}"></span><div><b>${esc(c.name)}</b><div class="hint" style="margin:0">${esc(c.detail)}</div></div></div>`).join('');
+
+/* ---------- sources ---------- */
+const TEMPLATE = `def resolve(ctx):
+    # ctx has: title, original_title, alt_titles, year, imdb_id,
+    #          season, episode, episode_title, type ("movie" | "tv")
+    # print() is safe: it goes to the log, not into the result.
+    return {
+        "streams": [
+            # {"url": "https://...", "quality": "1080p", "format": "mp4", "size": 123, "headers": {}},
+        ],
+        "subtitles": [],   # {"lang": "en", "url": "https://...", "format": "vtt"}
+        "audio": [],       # {"lang": "en"}
+    }
+`;
+async function viewSources() {
+  S.sources = await api('GET', '/sources');
+  if (S.view !== 'sources') return;
+  $('#main').innerHTML = `
+    <h2 class="title">Sources</h2><p class="sub">Each source is a script that finds streams. Clients only ever see its <b>public name</b>. Star ★ the ones you trust: <span class="mono">wait=first_starred</span> answers with those first. Give each a <b>rank</b> (1 = tried first, 2 = second…): the list below is in that order, and <span class="mono">max_sources</span> requests stop after the best ones.</p>
+    <div class="split">
+      <div class="card" style="padding:12px">
+        <div class="toolbar" style="margin-bottom:10px"><input type="text" id="srcSearch" placeholder="Search…" value="${esc(S.srcFilter)}" style="flex:1">
+          <button class="btn icon" data-act="src-new" title="New source">${ico('plus')}</button>
+          <button class="btn icon" data-act="src-export" title="Export sources (backup / move to another server)">${ico('download')}</button>
+          <button class="btn icon" data-act="src-import" title="Import sources from a file">${ico('upload')}</button></div>
+        <div id="srcList"></div></div>
+      <div id="srcDetail"></div>
+    </div>`;
+  renderSourceList();
+  if (S.selected && S.sources.some(s => s.id === S.selected)) await showSource(S.selected);
+  else $('#srcDetail').innerHTML = `<div class="card">${empty('Pick a source', 'Choose one on the left, or create a new one with +.')}</div>`;
+}
+function renderSourceList() {
+  const q = S.srcFilter.toLowerCase();
+  const list = S.sources.filter(x => !q || (x.name + ' ' + x.public_name).toLowerCase().includes(q));
+  $('#srcList').innerHTML = list.map(x => `
+    <div class="srcrow">
+      <button class="srcitem ${x.id === S.selected ? 'sel' : ''}" data-act="src-open" data-id="${x.id}">
+        <div class="n"><span>${x.rank ? `<span class="badge info plain" title="Rank ${x.rank}: tried ${x.rank === 1 ? 'first' : 'in position ' + x.rank}">#${x.rank}</span> ` : ''}${esc(x.name)}</span>${x.enabled ? '' : '<span class="badge plain">off</span>'}</div>
+        <div class="m">→ ${esc(pubName(x))} ${x.active_version ? `<span class="badge ok plain">v${x.active_version}</span>` : '<span class="badge warn plain">no script</span>'}${x.uses_browser ? ' <span class="badge info plain" title="Drives a real browser: counts against the browser-script limit">browser</span>' : ''}${x.peak_mb_max ? ` <span class="muted">${x.peak_mb_max} MB</span>` : ''}${x.avg_ms != null ? ` <span class="muted" title="Average response time">⏱ ${msFmt(x.avg_ms)}</span>` : ''}</div>
+      </button>
+      <button class="starbtn ${x.starred ? 'on' : ''}" data-act="src-star" data-id="${x.id}" title="${x.starred ? 'Starred: reliable source (click to remove)' : 'Click to star as a reliable source'}">${ico('star')}</button>
+    </div>`).join('') || empty(S.sources.length ? 'No match' : 'No sources yet', S.sources.length ? '' : 'Create your first one with +.');
+}
+function sourceForm(s) {
+  const p = s ? 'g' : 'n';
+  return `<div class="form">
+    <div><label class="l">Real name <span class="muted">(only you see this)</span></label><input type="text" id="${p}Name" value="${esc(s?.name)}" placeholder="internet-archive"></div>
+    <div><label class="l">Public name <span class="muted">(shown to clients)</span></label><input type="text" id="${p}Public" value="${esc(s?.public_name)}" placeholder="Server A">
+      <div class="hint">Leave empty to show “Server ${s ? s.id : 'N'}”.</div></div>
+    <div><label class="l">Base URL <span class="muted">(optional, for your notes)</span></label><input type="text" id="${p}Url" value="${esc(s?.base_url)}" placeholder="https://…"></div>
+    <div><label class="l">Language</label><input type="text" id="${p}Lang" value="${esc(s?.language || 'en')}"></div>
+    <div><label class="l">Rank <span class="muted">(1 = tried first, empty = last)</span></label><input type="number" id="${p}Rank" min="1" max="9999" value="${s?.rank ?? ''}" placeholder="none"></div>
+    <div><label class="l">Timeout (seconds)</label><input type="number" id="${p}Timeout" min="1" max="300" value="${s?.timeout_s ?? 30}"></div>
+    <div><label class="l">Status</label><label class="switch"><input type="checkbox" id="${p}Enabled" ${!s || s.enabled ? 'checked' : ''}><span>Enabled</span></label></div>
+    <div><label class="l">Reliability</label><label class="switch"><input type="checkbox" id="${p}Starred" ${s?.starred ? 'checked' : ''}><span>Starred (reliable source)</span></label></div>
+    <div><label class="l">Browser source</label><label class="switch"><input type="checkbox" id="${p}Browser" ${s?.uses_browser ? 'checked' : ''}><span>Drives a real browser (heavy, ~400 MB)</span></label>
+      <div class="hint" id="${p}BrowserHint">${browserHint(s)}</div></div>
+  </div>`;
+}
+function testLogReset() {
+  S.testLines = []; const w = $('#tLogWrap'); if (!w) return;
+  w.classList.remove('hidden'); $('#tLog').innerHTML = '<div class="ll lw">waiting for the first line…</div>'; $('#tLogInfo').textContent = '';
+}
+function testLogAppend(lines) {
+  const box = $('#tLog'); if (!box || !lines || !lines.length) return;
+  if (!S.testLines.length) box.innerHTML = '';
+  box.insertAdjacentHTML('beforeend', lines.map(l => {
+    const cls = l.src === 'runner' ? (/FAILED|internal error|stopped/.test(l.text) ? 'le' : 'lr') : (/Traceback|Error\b|Exception\b/.test(l.text) ? 'le' : '');
+    S.testLines.push(`[${l.t.toFixed(1)}s] ${l.src === 'runner' ? '# ' : ''}${l.text}`);
+    return `<div class="ll ${cls}"><span class="lt">${l.t.toFixed(1)}s</span>${esc(l.text)}</div>`;
+  }).join(''));
+  $('#tLogInfo').textContent = S.testLines.length + ' lines';
+  if ($('#tFollow') && $('#tFollow').checked) box.scrollTop = box.scrollHeight;
+}
+function testLogDone(r) { const lv = $('#tLive'); if (lv) lv.classList.add('hidden'); }
+function renderTestResult(r, status) {
+  if (!r) return;
+  if (status === 'cancelled') { $('#tOut').innerHTML = '<p class="muted" style="margin-top:12px">Stopped. The script was killed.</p>'; return; }
+  const streams = r.ok ? (r.result.streams || []) : [];
+  $('#tOut').innerHTML = `<div class="toolbar" style="margin:14px 0 8px">${r.ok ? badge('ok') : '<span class="badge err">error</span>'}
+    <span class="muted">v${r.version} · ${r.duration_ms} ms${r.peak_mb ? ` · peak ${r.peak_mb} MB` : ''}${r.ok ? ` · ${streams.length} streams · ${(r.result.subtitles || []).length} subtitles` : ''}</span></div>
+    ${streams.length ? `<div class="tablewrap"><table><tr><th>Quality</th><th>Format</th><th>Size</th><th>URL</th></tr>${streams.slice(0, 30).map(s => `<tr>
+      <td>${esc(s.quality || '–')}</td><td>${esc(s.format || '–')}</td><td>${bytes(s.size)}</td>
+      <td class="mono" style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.url)}</td></tr>`).join('')}</table></div>` : ''}
+    <details style="margin-top:10px"><summary class="muted" style="cursor:pointer">${r.ok ? 'Raw result' : 'Error details'}</summary>
+      <pre class="out">${esc(r.ok ? JSON.stringify(r.result, null, 2) : r.error)}</pre></details>
+    ${r.context ? `<details style="margin-top:6px"><summary class="muted" style="cursor:pointer">Context sent to the script</summary><pre class="out">${esc(JSON.stringify(r.context, null, 2))}</pre></details>` : ''}`;
+}
+const msFmt = ms => ms == null ? '–' : ms >= 1000 ? (ms / 1000).toFixed(1) + ' s' : ms + ' ms';
+function statsHtml(s) {
+  if (!s.stats_runs) return 'No response time yet: it is measured every time this source runs for a task.';
+  return `Response time: <b>${msFmt(s.last_ms)}</b> last run (${esc(s.last_status)}), <b>${msFmt(s.avg_ms)}</b> average over the last ${s.stats_runs} run(s) · found streams in <b>${s.found_rate}%</b> of them.`;
+}
+function browserHint(s) {
+  if (!s) return 'Detected from the script\'s imports once you upload it (playwright, selenium, pyvirtualdisplay…). Tick it yourself to override.';
+  const bits = [];
+  bits.push(s.browser_manual
+    ? `Set by you.${s.browser_detected !== s.uses_browser ? ` The script ${s.browser_detected ? 'looks like' : 'does not look like'} a browser script.` : ''} <a href="#" data-act="src-browser-auto" style="color:var(--accent)">Use auto-detect again</a>.`
+    : 'Detected automatically from the script\'s imports.');
+  bits.push(s.peak_runs ? `Peak RAM seen: <b>${s.peak_mb_max} MB</b> max, ${s.peak_mb_avg} MB average over ${s.peak_runs} run(s).` : 'No RAM measurement yet: run this source once.');
+  if (!s.uses_browser && (s.peak_mb_max || 0) > 250) bits.push(`<b style="color:var(--warn)">It used ${s.peak_mb_max} MB: consider ticking this box so it takes its turn.</b>`);
+  return bits.join(' ');
+}
+const readForm = p => ({
+  name: $(`#${p}Name`).value.trim(), public_name: $(`#${p}Public`).value.trim(), base_url: $(`#${p}Url`).value.trim(),
+  rank: $(`#${p}Rank`).value ? +$(`#${p}Rank`).value : null,
+  language: $(`#${p}Lang`).value.trim() || 'en', timeout_s: +$(`#${p}Timeout`).value || 30, enabled: $(`#${p}Enabled`).checked, starred: $(`#${p}Starred`).checked,
+  uses_browser: $(`#${p}Browser`).checked,
+});
+function newSourceForm() {
+  S.selected = null; renderSourceList();
+  $('#srcDetail').innerHTML = `<div class="card"><h3>New source</h3>${sourceForm(null)}
+    <div class="actions"><button class="btn" data-act="src-create">${ico('plus')} Create source</button></div></div>`;
+  $('#nName').focus();
+}
+async function showSource(id) {
+  const s = S.sources.find(x => x.id === id); if (!s) return;
+  S.selected = id; renderSourceList();
+  S.scripts = await api('GET', `/sources/${id}/scripts`);
+  S.curVer = (S.scripts.find(x => x.active) || S.scripts[S.scripts.length - 1] || {}).version || null;
+  $('#srcDetail').innerHTML = `
+    <div class="card"><h3>Settings <small>#${s.id}</small></h3>${sourceForm(s)}
+      <div class="hint" id="gStats" style="margin-top:10px">${statsHtml(s)}</div>
+      <div class="actions"><button class="btn" data-act="src-save">${ico('save')} Save settings</button>
+        <button class="btn danger" data-act="src-delete">${ico('trash')} Delete source</button></div></div>
+    <div class="card"><h3>Script <small>every save is a new version; old versions are kept</small></h3>
+      <div class="toolbar"><div class="vers" id="vers" style="margin:0;flex:1"></div>
+        <select id="exSel" data-change="example" style="width:auto"><option value="">Load an example…</option></select></div>
+      <div class="editor"><pre id="gutter">1</pre><textarea id="code" spellcheck="false" wrap="off"></textarea></div>
+      <div class="toolbar" style="margin:12px 0 0">
+        <input type="text" id="note" placeholder="Note (what changed?)" style="flex:1;min-width:180px">
+        <label class="switch"><input type="checkbox" id="act" checked><span>Activate</span></label>
+        <span class="dirty hidden" id="dirty">● unsaved</span>
+        <button class="btn" data-act="ver-save" title="Ctrl+S">${ico('save')} Save as new version</button>
+        <button class="btn ghost hidden" id="actBtn" data-act="ver-activate">Make v<span id="actV"></span> active</button></div></div>
+    <div class="card"><h3>Test run <small>runs the selected version exactly like a real request</small></h3>
+      <div class="form" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));align-items:end">
+        <div><label class="l">TMDB id</label><input type="number" id="tId" placeholder="10378"></div>
+        <div><label class="l">Type</label><select id="tType" data-change="ttype"><option>movie</option><option>tv</option></select></div>
+        <div><label class="l">Season</label><input type="number" id="tS" disabled></div>
+        <div><label class="l">Episode</label><input type="number" id="tE" disabled></div>
+        <div><button class="btn" id="tBtn" data-act="test-run" style="width:100%;justify-content:center">${ico('play')} Run</button></div></div>
+      <div class="toolbar" style="margin:12px 0 0">
+        <label class="switch" title="Also logs every Playwright/patchright call (DEBUG=pw:api). Very detailed, only for browser scripts."><input type="checkbox" id="tVerbose"><span>Verbose browser log</span></label>
+        <button class="btn ghost sm hidden" id="tStop" data-act="test-stop">Stop</button></div>
+      <div id="tLogWrap" class="hidden" style="margin-top:12px">
+        <div class="toolbar" style="margin:0 0 6px"><b>Live log</b><span id="tLive" class="livedot hidden" title="running"></span><span class="muted" id="tLogInfo"></span>
+          <span style="flex:1"></span>
+          <label class="switch"><input type="checkbox" id="tFollow" checked><span>Follow</span></label>
+          <button class="btn ghost sm" data-act="test-copylog">${ico('copy')} Copy</button>
+          <button class="btn ghost sm" data-act="test-clearlog">Clear</button></div>
+        <div class="logbox" id="tLog"></div></div>
+      <div id="tOut"></div></div>`;
+  const ta = $('#code');
+  ta.addEventListener('input', onEditorInput);
+  ta.addEventListener('scroll', () => { $('#gutter').scrollTop = ta.scrollTop; });
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Tab') { e.preventDefault(); const p = ta.selectionStart; ta.setRangeText('    ', p, ta.selectionEnd, 'end'); onEditorInput(); }
+  });
+  fillExamples();
+  if (S.curVer) await loadVersion(S.curVer); else { setCode(TEMPLATE, true); renderVersions(); }
+}
+function setCode(code, asLoaded) {
+  $('#code').value = code; if (asLoaded) S.loadedCode = code; onEditorInput();
+}
+function onEditorInput() {
+  const ta = $('#code'); if (!ta) return;
+  const n = ta.value.split('\n').length;
+  $('#gutter').textContent = Array.from({length: n}, (_, i) => i + 1).join('\n');
+  $('#gutter').scrollTop = ta.scrollTop;
+  $('#dirty').classList.toggle('hidden', !isDirty());
+}
+function renderVersions() {
+  $('#vers').innerHTML = S.scripts.map(v => `<button class="chip ${v.version === S.curVer ? 'sel' : ''}" data-act="ver-load" data-v="${v.version}">v${v.version}${v.active ? ' ●' : ''}</button>`).join('')
+    || '<span class="muted">No versions yet. Write a script and save it.</span>';
+  const cur = S.scripts.find(v => v.version === S.curVer);
+  $('#actBtn').classList.toggle('hidden', !cur || cur.active);
+  if (cur) $('#actV').textContent = cur.version;
+}
+async function loadVersion(v) {
+  const sc = await api('GET', `/sources/${S.selected}/scripts/${v}`);
+  S.curVer = v; setCode(sc.code, true); $('#note').value = sc.note || ''; renderVersions();
+}
+async function fillExamples() {
+  try { if (!S.examples) S.examples = await api('GET', '/examples'); } catch (e) { S.examples = []; }
+  const sel = $('#exSel'); if (!sel) return;
+  sel.innerHTML = '<option value="">Load an example…</option>' + S.examples.map((x, i) => `<option value="${i}">${esc(x.name)}</option>`).join('');
+}
+async function refreshSourcesList() { S.sources = await api('GET', '/sources'); renderSourceList(); }
+
+/* ---------- export / import of sources ---------- */
+function openDialog(inner, width = 640) {
+  const m = $('#modal');
+  m.innerHTML = `<div class="box" style="width:${width}px;max-height:88vh;overflow:auto">${inner}</div>`;
+  m.classList.remove('hidden');
+  const close = () => { m.classList.add('hidden'); m.onclick = null; document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  m.onclick = e => { if (e.target === m || e.target.closest('[data-close]')) close(); };
+  return close;
+}
+function impReport(r) {
+  const cls = {create: 'ok', update: 'info', copy: 'info', skip: 'plain', error: 'err'};
+  const lbl = {create: 'new', update: 'update', copy: 'copy', skip: 'skip', error: 'problem'};
+  return `<div class="hint" style="margin:12px 0 6px"><b>${r.dry_run ? 'Preview: nothing is imported yet.' : 'Done.'}</b>
+      ${r.created} new · ${r.updated} updated · ${r.copied} copies · ${r.skipped} skipped${r.errors ? ` · <span style="color:var(--err)">${r.errors} with problems (they are left out)</span>` : ''}</div>
+    <div class="tablewrap" style="max-height:260px;overflow:auto"><table><tr><th>Source</th><th></th><th>What happens</th></tr>
+    ${r.items.map(i => `<tr><td><b>${esc(i.final_name)}</b>${i.final_name !== i.name ? `<div class="muted">from “${esc(i.name)}”</div>` : ''}</td>
+      <td><span class="badge ${cls[i.action]}">${lbl[i.action]}</span></td><td class="${i.action === 'error' ? '' : 'muted'}"${i.action === 'error' ? ' style="color:var(--err)"' : ''}>${esc(i.detail)}${i.uses_browser && i.action !== 'skip' && i.action !== 'error' ? ' · browser' : ''}</td></tr>`).join('')}</table></div>`;
+}
+async function impPreview() {
+  const box = $('#iPreview'), go = $('#iGo'), f = $('#iFile').files[0];
+  go.disabled = true; S.imp = {data: null};
+  if (!f) { box.innerHTML = ''; return; }
+  if (f.size > 20e6) { box.innerHTML = '<p style="color:var(--err)">That file is too big (max 20 MB).</p>'; return; }
+  let data;
+  try { data = JSON.parse(await f.text()); } catch (e) { box.innerHTML = '<p style="color:var(--err)">That is not a JSON file.</p>'; return; }
+  box.innerHTML = '<p class="muted">Checking…</p>';
+  try {
+    const r = await api('POST', '/sources/import', {data, mode: $('#iMode').value, dry_run: true});
+    if (!$('#iPreview')) return;
+    S.imp = {data}; box.innerHTML = impReport(r); go.disabled = !(r.created + r.updated + r.copied);
+  } catch (e) { if ($('#iPreview')) box.innerHTML = `<p style="color:var(--err)">${esc(e.message)}</p>`; }
+}
+
+/* ---------- telegram ---------- */
+async function viewTelegram() {
+  const t = await api('GET', '/telegram');
+  if (S.view !== 'telegram') return;
+  S.tg = t;
+  const st = t.stats, le = st.last_error;
+  $('#main').innerHTML = `<h2 class="title">Telegram</h2>
+    <p class="sub">Sends important errors and events to a Telegram group, <b>one topic per kind</b> of message (source failures, download failures, server errors…). The same error is sent only once per few minutes, so a broken source cannot flood the group.</p>
+    <div class="card"><h3>Connection ${t.enabled && t.bot_token_set ? badge('ok') : '<span class="badge plain">off</span>'}</h3>
+      <div class="form">
+        <div><label class="l">Alerts</label><label class="switch"><input type="checkbox" id="tgEnabled" ${t.enabled ? 'checked' : ''}><span>Send alerts to Telegram</span></label></div>
+        <div><label class="l">Bot token <span class="muted">(from @BotFather)</span></label><input type="password" id="tgToken" autocomplete="off" placeholder="${t.bot_token_set ? esc(t.bot_token_hint) + '  saved: leave empty to keep' : '123456789:AAH…'}">
+          ${t.bot_token_set ? '<div class="hint"><a href="#" data-act="tg-rmtoken" style="color:var(--accent)">Remove the saved token</a></div>' : ''}</div>
+        <div><label class="l">Group chat id</label><input type="text" id="tgChat" value="${esc(t.chat_id)}" placeholder="-1001234567890"><div class="hint">Add the bot to your group (as admin, so it can post in topics). Use “Find ids” below to read it.</div></div>
+        <div><label class="l">Server name <span class="muted">(shown in messages)</span></label><input type="text" id="tgServer" value="${esc(t.server_name)}" placeholder="vps-1"></div>
+        <div><label class="l">Same error again after <span class="muted">(seconds)</span></label><input type="number" id="tgDedupe" min="0" max="86400" value="${t.dedupe_s}"></div>
+        <div><label class="l">At most per minute</label><input type="number" id="tgRate" min="1" max="60" value="${t.rate_per_min}"></div>
+      </div>
+      <div class="hint" style="margin-top:8px">${st.sent} sent · ${st.failed} failed · ${st.suppressed} repeats held back${st.dropped ? ` · ${st.dropped} dropped (too many at once)` : ''}${le ? `<br><span style="color:var(--err)">Last error (${esc(le.category)}): ${esc(le.error)}${le.hint ? ' → ' + esc(le.hint) : ''}</span>` : ''}</div>
+    </div>
+    <div class="card"><h3>Alerts and reports</h3>
+      <div class="form">
+        <div><label class="l">Low disk space: warn when free space is below <span class="muted">(GB, 0 = never)</span></label><input type="number" id="tgLowGb" min="0" step="0.5" value="${t.low_disk_gb}">
+          <div class="hint">Checked every 5 minutes on the disk that holds the library. You also get a message when it is OK again.</div></div>
+        <div><label class="l">While it stays low, warn again every <span class="muted">(hours)</span></label><input type="number" id="tgLowRep" min="1" max="168" value="${t.low_disk_repeat_h}"></div>
+        <div><label class="l">A source keeps failing: alert after this many failed runs in a row <span class="muted">(0 = never)</span></label><input type="number" id="tgStreak" min="0" max="100" value="${t.fail_streak}">
+          <div class="hint">One message when it starts failing, one when it works again. (Single failures are reported separately, once per few minutes.)</div></div>
+        <div><label class="l">Daily report</label><label class="switch"><input type="checkbox" id="tgRepOn" ${t.report.enabled ? 'checked' : ''}><span>Send a summary of the last 24 hours every day</span></label>
+          <div class="hint">Tasks, per-source success rate and speed, downloads, library, disk, server health, errors. Goes to the “Daily report” topic below.</div></div>
+        <div><label class="l">Send at <span class="muted">(HH:MM, your time zone)</span></label><input type="time" id="tgRepTime" value="${esc(t.report.time)}"></div>
+        <div><label class="l">Your time zone <span class="muted">(hours from UTC, e.g. 3.5)</span></label><input type="number" id="tgRepOff" min="-12" max="14" step="0.5" value="${t.report.utc_offset}"></div>
+      </div>
+      <div class="actions"><button class="btn" data-act="tg-save">Save</button><button class="btn ghost" data-act="tg-report">Send the report now</button></div></div>
+    <div class="card"><h3>Topics <small>one per kind of message</small></h3>
+      <div class="tablewrap"><table><tr><th>Kind</th><th>On</th><th>Topic id</th><th>Other chat <small class="muted">(optional)</small></th><th></th></tr>
+      ${t.categories.map(c => `<tr><td><b>${esc(c.label)}</b><div class="hint" style="margin:0">${esc(c.description)}</div></td>
+        <td><label class="switch"><input type="checkbox" id="tgOn_${c.key}" ${c.enabled ? 'checked' : ''}><span></span></label></td>
+        <td><input type="number" min="1" id="tgTopic_${c.key}" value="${c.topic_id ?? ''}" placeholder="General" style="width:110px"></td>
+        <td><input type="text" id="tgChat_${c.key}" value="${esc(c.chat_id)}" placeholder="same as above" style="width:170px"></td>
+        <td style="text-align:right"><button class="btn ghost sm" data-act="tg-test" data-cat="${c.key}">Test</button></td></tr>`).join('')}</table></div>
+      <div class="hint" style="margin-top:8px">Empty topic id = the group's General chat. Save first, then press Test: the message must arrive in the right topic.</div>
+      <div class="actions"><button class="btn" data-act="tg-save">Save</button><button class="btn ghost" data-act="tg-test" data-cat="">Test (System topic)</button></div></div>
+    <div class="card"><h3>Find ids</h3>
+      <p class="hint" style="margin:0 0 10px">1) Add the bot to the group. 2) Send any message (for example <span class="mono">/ping</span>) <b>inside each topic</b>. 3) Press the button: the chats and topics the bot saw are listed, with their ids.</p>
+      <button class="btn ghost" data-act="tg-find">Find chats and topics</button><div id="tgFound"></div></div>`;
+}
+function tgRead() {
+  const cats = {};
+  for (const c of S.tg.categories) {
+    const topic = $(`#tgTopic_${c.key}`).value.trim();
+    cats[c.key] = {enabled: $(`#tgOn_${c.key}`).checked, topic_id: topic === '' ? null : +topic, chat_id: $(`#tgChat_${c.key}`).value.trim()};
+  }
+  const body = {enabled: $('#tgEnabled').checked, chat_id: $('#tgChat').value.trim(), server_name: $('#tgServer').value.trim(),
+    dedupe_s: +$('#tgDedupe').value, rate_per_min: +$('#tgRate').value, categories: cats,
+    low_disk_gb: +$('#tgLowGb').value, low_disk_repeat_h: +$('#tgLowRep').value || 6, fail_streak: +$('#tgStreak').value,
+    report: {enabled: $('#tgRepOn').checked, time: $('#tgRepTime').value || '08:00', utc_offset: +$('#tgRepOff').value || 0}};
+  const tok = $('#tgToken').value.trim(); if (tok) body.bot_token = tok;
+  return body;
+}
+function tgFoundHtml(r) {
+  if (!r.ok) return `<p style="color:var(--err);margin-top:10px">${esc(r.error)}${r.hint ? ' → ' + esc(r.hint) : ''}</p>`;
+  if (!r.items.length) return '<p class="muted" style="margin-top:10px">The bot has seen no messages yet. Send a message in the group (inside each topic) and try again. If the bot is not an admin, start the message with /.</p>';
+  const opts = S.tg.categories.map(c => `<option value="${c.key}">${esc(c.label)}</option>`).join('');
+  return `<div class="tablewrap" style="margin-top:10px"><table><tr><th>Chat</th><th>Chat id</th><th>Topic</th><th>Topic id</th><th>Last message</th><th></th></tr>
+    ${r.items.map(i => `<tr><td>${esc(i.chat)} <span class="muted">${esc(i.type || '')}</span></td><td class="mono">${i.chat_id}</td>
+      <td>${i.topic_id ? esc(i.topic || '(name unknown)') : '<span class="muted">General</span>'}</td><td class="mono">${i.topic_id ?? '–'}</td><td class="muted">${esc(i.last)}</td>
+      <td style="white-space:nowrap">${i.topic_id ? `<select class="tgPick">${opts}</select> <button class="btn ghost sm" data-act="tg-usetopic" data-chat="${i.chat_id}" data-topic="${i.topic_id}">Use topic</button>`
+        : `<button class="btn ghost sm" data-act="tg-usechat" data-chat="${i.chat_id}">Use as group chat</button>`}</td></tr>`).join('')}</table></div>`;
+}
+
+/* ---------- api keys ---------- */
+async function viewKeys() {
+  const keys = await api('GET', '/api-keys');
+  if (S.view !== 'keys') return;
+  const nk = S.newKey; S.newKey = null;   // a new key is shown once, then gone
+  $('#main').innerHTML = `
+    <h2 class="title">API keys</h2><p class="sub">Keep keys on your website's backend, never in browser code.</p>
+    ${nk ? `<div class="keybox"><div style="flex-basis:100%"><b>New key for “${esc(nk.name)}”</b> <span class="muted">— copy it now. It is shown only once.</span></div>
+      <code class="mono">${esc(nk.key)}</code><button class="btn" data-act="copy" data-text="${esc(nk.key)}">${ico('copy')} Copy</button></div>` : ''}
+    <div class="card"><h3>Create key</h3><div class="toolbar" style="margin:0">
+      <input type="text" id="kName" placeholder="Name, e.g. my-movie-site" style="flex:1;min-width:200px">
+      <input type="number" id="kRate" value="60" min="1" style="width:130px" title="Requests per minute">
+      <button class="btn" data-act="key-create">${ico('plus')} Create</button></div>
+      <div class="hint">Second field = rate limit (requests per minute).</div></div>
+    <div class="card"><div class="tablewrap"><table><tr><th>Name</th><th>Key</th><th>Rate / min</th><th>Last used</th><th>Status</th><th></th></tr>
+    ${keys.map(k => `<tr><td><b>${esc(k.name)}</b></td><td class="mono">${esc(k.prefix)}…</td>
+      <td><input type="number" value="${k.rate_limit_per_min}" min="1" style="width:90px" data-change="rate" data-id="${k.id}"></td>
+      <td class="muted">${ago(k.last_used_at)}</td><td>${k.enabled ? badge('ok', 'enabled') : '<span class="badge err">disabled</span>'}</td>
+      <td style="text-align:right"><button class="btn ghost sm" data-act="key-toggle" data-id="${k.id}" data-en="${k.enabled ? 0 : 1}">${k.enabled ? 'Disable' : 'Enable'}</button></td></tr>`).join('')
+      || `<tr><td colspan="6">${empty('No keys yet', 'Create one above.')}</td></tr>`}</table></div></div>`;
+}
+
+/* ---------- library ---------- */
+const subCell = i => {
+  const st = i.subtitles_status || 'none';
+  if (st === 'none' && !i.subtitle_count) return '<span class="muted">–</span>';
+  const cls = ({pending: 'info', done: 'ok', partial: 'warn'})[st] || 'plain';
+  return `${i.subtitle_count ?? 0} <span class="badge ${cls}">${esc(st)}</span>`;
+};
+const fmtEta = n => n == null ? '' : n < 60 ? `${n}s` : n < 3600 ? `${Math.round(n / 60)} min` : `${(n / 3600).toFixed(1)} h`;
+async function viewLibrary() {
+  $('#main').innerHTML = `
+    <h2 class="title">Library</h2><p class="sub">Downloads on your server. They delete themselves when their time is up. <b>HLS</b> items can be played while they are still downloading. See the real folders on disk under <a href="#" data-act="nav" data-v="files" style="color:var(--accent)">Files on disk</a>.</p>
+    <div class="toolbar">
+      <input type="text" id="libSearch" placeholder="Search title, id, provider, error…" value="${esc(S.libQ)}" style="flex:1;min-width:200px;max-width:380px">
+      <select id="libStatus" data-change="libstatus" style="width:auto">${['', 'downloading', 'queued', 'ready', 'failed', 'expired', 'deleted'].map(x => `<option value="${x}" ${S.libSt === x ? 'selected' : ''}>${x || 'All statuses'}</option>`).join('')}</select>
+      <button class="btn ghost" data-act="lib-refresh">${ico('refresh')} Refresh</button>
+      <button class="btn ghost" data-act="maint" data-job="cancel_downloads" data-label="Cancel all running downloads?" data-danger="1">Cancel running</button>
+      <button class="btn danger" data-act="maint" data-job="clear_history" data-danger="1" data-label="Delete EVERY library entry and its files (videos, HLS, subtitle packs) and cancel running downloads? This cannot be undone." data-then="library">Clear history</button>
+      <span class="muted" id="libCount"></span></div>
+    <div class="card" id="libTable"></div>`;
+  await refreshLibrary();
+}
+async function refreshLibrary() {
+  S.libItems = await api('GET', '/library');
+  if (S.view !== 'library') return;
+  renderLibrary();
+  clearTimeout(S.timer);
+  if (S.libItems.some(i => ['queued', 'downloading'].includes(i.status))) S.timer = setTimeout(() => S.view === 'library' && run(refreshLibrary), 3000);
+}
+function renderLibrary() {
+  const q = S.libQ.toLowerCase();
+  const items = S.libItems.filter(i => (!S.libSt || i.status === S.libSt) &&
+    (!q || [i.id, i.title, i.source, i.public_name, i.error, i.quality, i.task_id].join(' ').toLowerCase().includes(q)));
+  $('#libCount').textContent = `${items.length} of ${S.libItems.length}`;
+  $('#libTable').innerHTML = `<div class="tablewrap"><table><tr><th>File</th><th>Provider</th><th>Mode</th><th>Quality</th><th>Status</th><th style="min-width:130px">Progress</th><th>Speed</th><th>Subtitles</th><th>Size</th><th>Deletes</th><th></th></tr>
+    ${items.map(i => {
+      const pct = i.status === 'ready' ? 100 : i.total_bytes ? Math.min(99, Math.round((i.size || 0) / i.total_bytes * 100)) : 0;
+      const live = ['ready', 'queued', 'downloading'].includes(i.status);
+      const hlsMode = i.mode === 'hls';
+      return `<tr><td class="mono">${esc(i.id)}<div class="hint" style="margin:0">${esc(i.title || i.task_id)}${i.season != null ? ` S${i.season}E${i.episode}` : ''}</div></td>
+        <td><b>${esc(i.source)}</b><div class="hint" style="margin:0">shown as “${esc(i.public_name || '–')}”</div></td>
+        <td>${hlsMode ? '<span class="badge info plain">HLS</span>' : i.mode === 'subs' ? '<span class="badge warn plain">subs</span>' : '<span class="badge plain">file</span>'}</td><td>${esc(i.quality || '–')}</td>
+        <td>${badge(i.status)}${hlsMode && i.status !== 'failed' ? (i.playable ? ' <span class="badge ok">playable</span>' : ' <span class="badge warn plain">not yet</span>') : ''}${i.error ? `<details style="max-width:280px"><summary class="hint" style="color:var(--err);cursor:pointer;margin:0">show error</summary><div class="mono" style="color:var(--err);white-space:pre-wrap;word-break:break-word">${esc(i.error)}</div></details>` : ''}</td>
+        <td><div class="bar ${i.status === 'failed' ? 'err' : i.status === 'ready' ? 'ok' : ''}"><i style="width:${pct}%"></i></div><span class="hint">${pct}%</span></td>
+        <td>${i.download_speed != null ? `${bytes(i.download_speed)}/s<div class="hint" style="margin:0">${i.eta_seconds != null ? 'ETA ' + fmtEta(i.eta_seconds) : ''}</div>` : '–'}</td>
+        <td>${subCell(i)}</td>
+        <td>${bytes(i.size)}</td><td class="muted">${i.status === 'ready' ? when(i.delete_at) : '–'}</td>
+        <td style="text-align:right;white-space:nowrap">${['ready', 'downloading'].includes(i.status) ? `<button class="btn ghost sm" data-act="files-open" data-id="${esc(i.id)}" title="Open / copy link">${ico('play')}</button> ` : ''}${live ? `<button class="btn danger sm" data-act="lib-del" data-id="${esc(i.id)}">${ico('trash')}</button>` : ''}</td></tr>`;
+    }).join('') || `<tr><td colspan="11">${empty(S.libItems.length ? 'No match' : 'Nothing downloaded yet', S.libItems.length ? 'Try another search or status.' : 'Request a library download from the API and it will appear here.')}</td></tr>`}</table></div>`;
+}
+
+/* ---------- files on disk ---------- */
+async function viewFiles() {
+  S.files = await api('GET', '/files');
+  if (S.view !== 'files') return;
+  const f = S.files;
+  $('#main').innerHTML = `
+    <h2 class="title">Files on disk</h2><p class="sub">The real folders inside <span class="mono">${esc(f.root)}</span>. Each download lives in one folder: video (or playlist + segments) and subtitles. <b>Orphan</b> = nothing alive points at the folder (failed, expired or leftover from a crash): safe to delete.</p>
+    <div class="grid">
+      <div class="stat"><b>${bytes(f.total_bytes)}</b><span>used by the library · ${f.items.length} folder(s)</span></div>
+      <div class="stat"><b style="color:${f.orphans ? 'var(--warn)' : 'inherit'}">${f.orphans}</b><span>orphan folders · ${bytes(f.orphan_bytes)}</span></div>
+      <div class="stat"><b>${bytes(f.disk_free)}</b><span>free of ${bytes(f.disk_total)}</span></div>
+    </div>
+    <div class="toolbar">
+      <input type="text" id="fileSearch" placeholder="Search id or title…" value="${esc(S.fq)}" style="flex:1;min-width:200px;max-width:340px">
+      <label class="switch"><input type="checkbox" id="fileOrph" data-change="fileorph" ${S.fOrph ? 'checked' : ''}><span>Only orphans</span></label>
+      <button class="btn ghost" data-act="files-refresh">${ico('refresh')} Refresh</button>
+      <button class="btn ghost" data-act="files-cleanup" data-what="orphans">${ico('trash')} Delete orphans</button>
+      <button class="btn danger" data-act="files-cleanup" data-what="everything">Delete everything</button></div>
+    <div class="card" id="fileTable"></div>
+    <div class="card"><h3>Clean disk <small>removes leftovers nothing needs</small></h3>
+      <p class="hint" style="margin:0 0 10px">Orphan library folders, old script and browser temp files, stale virtual-display locks and package caches. Running downloads, fresh files and your data folder are never touched. <b>Scan</b> only shows what would go.</p>
+      <div class="toolbar" style="margin:0"><label class="switch"><input type="checkbox" id="dcDb" checked><span>Also tidy the database (expire what is due, forget failed / expired entries, purge old tasks)</span></label></div>
+      <div class="toolbar" style="margin:6px 0 0;gap:14px;flex-wrap:wrap"><label class="switch" title="Asks the host agent on the VPS to clean what the app cannot reach: stopped containers, unused Docker images and build cache (never volumes), system logs, apt, temp files, caches."><input type="checkbox" id="dcHost" checked><span>Also clean the host (the whole VPS, not only candyresolver)</span></label>
+        <label class="switch" title="Also removes ALL Docker images not used by a container and older than 7 days."><input type="checkbox" id="dcHostAggr"><span>aggressive (all unused Docker images)</span></label></div>
+      <div id="hcBox" style="margin:8px 0 0"></div>
+      <div class="actions" style="margin-top:6px"><button class="btn ghost" data-act="disk-scan">Scan (deletes nothing)</button><button class="btn" data-act="disk-clean">${ico('trash')} Clean disk</button></div>
+      <div id="dcOut"></div>
+      <div id="acBox" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><p class="muted">Loading the automatic clean…</p></div></div>`;
+  renderFiles();
+  loadAutoclean();
+  loadHostclean();
+}
+function liveHtml(l) {
+  const t = l.totals || {};
+  const head = `<div class="hint" style="margin:0 0 8px"><b>${l.active}</b> watching now (limit ${l.max_active}) · ${t.started || 0} started since the last restart · <b>${bytes(t.bytes || 0)}</b> relayed · ${t.errors || 0} error(s)</div>`;
+  if (!l.sessions.length) return head + '<span class="muted">No live streams yet. Your player asks for one with POST /v1/tasks/{id}/live.</span>';
+  const ago = ts => { const s = Math.max(0, Math.round(Date.now() / 1000 - ts)); return s < 90 ? s + ' s ago' : Math.round(s / 60) + ' min ago'; };
+  return head + `<div class="tablewrap"><table><tr><th>Source</th><th>Quality</th><th>Type</th><th>Last request</th><th>Sent</th><th>Errors</th><th></th></tr>
+    ${l.sessions.map(x => `<tr><td><b>${esc(x.source)}</b><div class="muted mono" style="font-size:11px">${esc(x.id)}</div></td><td>${esc(x.quality || '–')}</td><td>${esc(x.kind)}</td>
+      <td>${x.active ? '<span class="badge ok">watching</span> ' : x.dead ? '<span class="badge err">link expired</span> ' : '<span class="badge plain">idle</span> '}<span class="muted">${ago(x.last_seen)}</span></td>
+      <td>${bytes(x.bytes_out)}</td><td>${Object.keys(x.errors).length ? Object.entries(x.errors).map(([k, v]) => `<span class="badge warn" title="${esc(k)}">${esc(k)} ×${v}</span>`).join(' ') : '–'}</td>
+      <td style="text-align:right"><button class="btn danger sm" data-act="live-end" data-id="${esc(x.id)}">End</button></td></tr>`).join('')}</table></div>`;
+}
+function hostHtml(h) {
+  const when = t => new Date(t * 1000).toLocaleString();
+  let top;
+  if (!h.configured) top = '<span class="badge warn">not mounted</span> The host folder is not mounted into the app. Add <span class="mono">./hostclean:/hostclean</span> to the api volumes in docker-compose.yml and restart.';
+  else if (!h.agent_alive) top = '<span class="badge warn">host agent not running</span> Install it once, on the VPS: <span class="mono">sudo ./scripts/host_cleanup.sh --install-agent</span>. Until then only candyresolver’s own files are cleaned.';
+  else top = `<span class="badge ok">host agent connected</span> ${esc(h.host || '')} · seen ${Math.max(0, Math.round(Date.now() / 1000 - h.agent_seen_at))} s ago${h.pending ? ' · <b>request sent, waiting for the agent (up to a minute)…</b>' : ''}${h.running ? ' · <b>cleaning the host…</b>' : ''}`;
+  const l = h.last;
+  const last = l ? `<div class="hint" style="margin-top:6px">Last host run <b>${when(l.finished_at)}</b>${l.dry_run ? ' (<b>scan</b>: nothing was deleted)' : ''}: ${l.ok ? '' : '<span style="color:var(--err)">failed · </span>'}freed <b>${bytes((l.freed_kb || 0) * 1024)}</b> · free space now <b>${bytes((l.free_kb || 0) * 1024)}</b></div>
+    <details><summary class="muted" style="cursor:pointer">Log of that run</summary><pre class="out">${esc((l.log || []).join('\n'))}</pre></details>` : '';
+  return `<div class="hint">${top}</div>${last}`;
+}
+async function pollHost(id) {
+  const mine = S.hostPoll = id || 'x', stop = Date.now() + 15 * 60e3;
+  while (Date.now() < stop && S.hostPoll === mine) {
+    let h; try { h = await api('GET', '/hostclean'); } catch (e) { return; }
+    if (!$('#hcBox')) return;
+    $('#hcBox').innerHTML = hostHtml(h);
+    const done = id ? (h.last && h.last.id === id) : (!h.pending && !h.running);
+    if (done) { if (id) toast(h.last.dry_run ? 'Host scan finished: see the log' : `Host cleaned: freed ${bytes((h.last.freed_kb || 0) * 1024)}`); return; }
+    await new Promise(r => setTimeout(r, 4000));
+  }
+}
+async function loadHostclean() {
+  try { const h = await api('GET', '/hostclean'); if ($('#hcBox')) { $('#hcBox').innerHTML = hostHtml(h); if (h.pending || h.running) pollHost(null); } }
+  catch (e) { if ($('#hcBox')) $('#hcBox').innerHTML = `<span style="color:var(--err)">${esc(e.message)}</span>`; }
+}
+function hostAnswer(r) {                       // what the app said about the host request that came with a scan / clean
+  if (!r) return;
+  if (r.ok) pollHost(r.id || null); else toast(r.error || 'Host clean was not requested', 'err');
+}
+function acHtml(a) {
+  const fmtIn = s => s <= 0 ? 'any moment' : s < 3600 ? Math.ceil(s / 60) + ' min' : Math.floor(s / 3600) + ' h ' + Math.round((s % 3600) / 60) + ' min';
+  const l = a.last;
+  const last = l ? `Last run <b>${new Date(l.at * 1000).toLocaleString()}</b> (${esc(l.trigger)}): freed <b>${bytes(l.freed_bytes)}</b>, ${l.removed} item(s) removed${l.errors ? `, <span style="color:var(--err)">${l.errors} error(s)</span>` : ''}${l.duration_s != null ? ` in ${l.duration_s}s` : ''}.`
+    : 'It has not run yet.';
+  return `<h3 style="margin:0 0 6px;font-size:14px">Automatic clean</h3>
+    <div class="toolbar" style="margin:0 0 6px;gap:14px;flex-wrap:wrap">
+      <label class="switch"><input type="checkbox" id="acOn" ${a.enabled ? 'checked' : ''}><span>Run automatically every</span></label>
+      <input type="number" id="acHours" min="1" max="168" value="${a.every_hours}" style="width:80px"><span class="muted">hours</span>
+      <label class="switch"><input type="checkbox" id="acDb" ${a.database ? 'checked' : ''}><span>also tidy the database</span></label>
+      <label class="switch" title="While the disk is nearly full (under 7% or 1 GB free) it also runs between the scheduled times, at most every 15 minutes."><input type="checkbox" id="acEm" ${a.emergency ? 'checked' : ''}><span>extra runs when the disk is nearly full</span></label>
+      <label class="switch" title="Each automatic run also asks the host agent to clean the whole VPS (needs the agent: scripts/host_cleanup.sh --install-agent)."><input type="checkbox" id="acHost" ${a.host ? 'checked' : ''}><span>also clean the host (whole VPS)</span></label>
+      <label class="switch"><input type="checkbox" id="acHostAggr" ${a.host_aggressive ? 'checked' : ''}><span>aggressive</span></label>
+      <button class="btn" data-act="ac-save">Save</button></div>
+    <div class="hint">${last}${a.enabled ? ` Next run in <b>${fmtIn(a.next_in_s)}</b>.` : ' Automatic clean is <b>off</b>.'} It removes exactly what “Clean disk” removes, and tells Telegram (System topic) only when it freed a lot, hit errors, or the disk was nearly full.</div>`;
+}
+async function loadAutoclean() {
+  try { const a = await api('GET', '/autoclean'); if ($('#acBox')) $('#acBox').innerHTML = acHtml(a); }
+  catch (e) { if ($('#acBox')) $('#acBox').innerHTML = `<p style="color:var(--err)">${esc(e.message)}</p>`; }
+}
+function diskReport(r, done) {
+  const rows = r.categories || [];
+  const head = done
+    ? `<div class="toolbar" style="margin:14px 0 8px"><span class="badge ok">done</span><span><b>${bytes(r.freed_bytes)}</b> freed · ${r.removed} item(s) removed · free space ${bytes(r.before.free)} → <b>${bytes(r.after.free)}</b></span>${r.errors ? `<span class="badge warn">${r.errors} error(s)</span>` : ''}</div>`
+    : `<div class="toolbar" style="margin:14px 0 8px"><span class="badge info">scan</span><span><b>${bytes(r.total_bytes)}</b> in ${r.total_items} item(s) can be removed · free space now ${bytes(r.disk.free)} of ${bytes(r.disk.total)}</span></div>`;
+  const db = done && r.database && Object.keys(r.database).length
+    ? `<div class="hint" style="margin:0 0 8px">Database: ${Object.entries(r.database).map(([k, v]) => `${esc(k.replace(/_/g, ' '))}: <b>${v}</b>`).join(' · ')}</div>` : '';
+  if (!rows.length) return head + db + '<p class="muted">Nothing to clean: no leftovers found.</p>';
+  return head + db + `<div class="tablewrap"><table><tr><th>What</th><th>${done ? 'Removed' : 'Items'}</th><th>${done ? 'Freed' : 'Size'}</th><th>${done ? 'Errors' : 'Examples'}</th></tr>
+    ${rows.map(c => `<tr><td>${esc(c.label)}</td><td>${done ? c.removed : c.items}</td><td><b>${bytes(done ? c.freed_bytes : c.bytes)}</b></td>
+      <td class="mono" style="max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap${done && c.errors.length ? ';color:var(--err)' : ''}">${esc(done ? c.errors.join(' | ') : (c.samples || []).join('  ·  '))}</td></tr>`).join('')}</table></div>`;
+}
+function renderFiles() {
+  const f = S.files, q = S.fq.toLowerCase();
+  const items = f.items.filter(i => (!S.fOrph || i.orphan) && (!q || [i.id, i.title, i.source, i.status].join(' ').toLowerCase().includes(q)));
+  const stat = i => i.kind === 'file' ? '<span class="badge warn plain">stray file</span>'
+    : i.orphan ? `<span class="badge warn">orphan</span>${i.status ? ` <span class="muted">${esc(i.status)}</span>` : i.known ? '' : ' <span class="muted">not in database</span>'}`
+    : badge(i.status) + (i.downloading ? ' <span class="badge info plain">writing</span>' : '');
+  $('#fileTable').innerHTML = `<div class="tablewrap"><table><tr><th>Folder</th><th>Title</th><th>State</th><th>Mode</th><th>Files</th><th>Size</th><th>Last write</th><th>Deletes</th><th></th></tr>
+    ${items.map(i => {
+      const open = S.fOpen.has(i.id), list = S.fileLists[i.id];
+      const main = `<tr><td class="mono">${esc(i.id)}</td>
+        <td>${esc(i.title || '–')}${i.season != null ? ` <span class="muted">S${i.season}E${i.episode}</span>` : ''}<div class="hint" style="margin:0">${esc(i.source || '')} ${esc(i.quality || '')}</div></td>
+        <td>${stat(i)}</td><td>${i.mode ? `<span class="badge plain ${i.mode === 'hls' ? 'info' : ''}">${esc(i.mode)}</span>` : '–'}</td>
+        <td>${i.files}</td><td><b>${bytes(i.bytes)}</b></td><td class="muted">${ago(i.modified)}</td>
+        <td class="muted">${i.status === 'ready' ? when(i.delete_at) : '–'}</td>
+        <td style="text-align:right;white-space:nowrap">${i.kind === 'dir' ? `
+          ${['ready', 'downloading'].includes(i.status) && !i.orphan ? `<button class="btn ghost sm" data-act="files-open" data-id="${esc(i.id)}" title="Open / copy link">${ico('play')}</button> ` : ''}
+          <button class="btn ghost sm" data-act="files-expand" data-id="${esc(i.id)}">${open ? 'Hide' : 'Files'}</button>
+          <button class="btn danger sm" data-act="files-del" data-id="${esc(i.id)}">${ico('trash')}</button>` : ''}</td></tr>`;
+      const sub = open ? `<tr class="fileexp"><td colspan="9">${list ? `<div class="hint" style="margin:0 0 6px">${list.count} file(s)${list.count > list.files.length ? ` · showing the biggest ${list.files.length}` : ''}</div>
+          <div class="tablewrap"><table>${list.files.map(x => `<tr><td class="mono">${esc(x.path)}</td><td>${bytes(x.bytes)}</td><td class="muted">${ago(x.modified)}</td></tr>`).join('')}</table></div>` : 'Loading…'}</td></tr>` : '';
+      return main + sub;
+    }).join('') || `<tr><td colspan="9">${empty(f.items.length ? 'No match' : 'The library folder is empty', f.items.length ? 'Try another search.' : 'Downloads will appear here.')}</td></tr>`}</table></div>`;
+}
+
+/* ---------- logs ---------- */
+async function viewLogs() {
+  $('#main').innerHTML = `<h2 class="title">Logs</h2><p class="sub">Everything the resolver logs: requests, source runs, downloads, ffmpeg errors. Kept in memory (last 3000 lines) with secrets masked. <span class="mono">docker compose logs -f api</span> is the permanent record.</p>
+    <div class="card"><div id="fullLog"></div></div>`;
+  S.lv = mountLog($('#fullLog'), {height: Math.max(360, innerHeight - 330)});
+}
+
+/* ---------- system ---------- */
+async function viewSystem() {
+  const checks = await api('GET', '/checks');
+  if (S.view !== 'system') return;
+  const jobs = [
+    ['expire_library', 'Delete expired files now', 'Removes library files whose time is up (normally every 5 min).'],
+    ['sweep_orphans', 'Sweep orphan folders', 'Deletes folders no live download points at.'],
+    ['expire_tasks', 'Expire task results now', 'Drops stream links of tasks past their lifetime.'],
+    ['purge_tasks', 'Purge old tasks', 'Deletes task records older than the retention period.'],
+    ['forget_finished', 'Forget finished entries', 'Removes only failed / expired / deleted rows (their files are already gone).'],
+    ['clear_history', 'Clear ALL library history', 'Deletes EVERY library entry (videos, HLS, subtitle packs) and its files. Cancels running downloads.', true],
+    ['cancel_downloads', 'Cancel all downloads', 'Stops every running download and removes its partial files.', true],
+  ];
+  $('#main').innerHTML = `<h2 class="title">System</h2><p class="sub">Machine and container health. Press Refresh, or choose how often it updates itself; charts show the last 30 minutes.</p>
+    ${refreshBar()}
+    <div class="grid" id="sysStats"></div>
+    <div class="grid" id="sysCharts" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))"></div>
+    <div class="card"><h3>CPU cores</h3><div id="sysCores"></div></div>
+    <div class="card"><h3>Processes <small>started by the resolver: ffmpeg, Chrome, Xvfb, scripts</small></h3><div id="sysProcs"></div></div>
+    <div class="card"><h3>Live streams <small>played through candyresolver, nothing is saved</small></h3><div id="sysLive"></div></div>
+    <div class="card"><h3>Checks</h3><div id="sysChecks">${checksHtml(checks)}</div></div>
+    <div class="card"><h3>Maintenance</h3><div class="maint">${jobs.map(([j, t, d, danger]) => `<div class="m"><div><b>${esc(t)}</b><div class="hint" style="margin:2px 0 0">${esc(d)}</div></div>
+      <button class="btn ${danger ? 'danger' : 'ghost'} sm" style="align-self:flex-start" data-act="maint" data-job="${j}" data-label="${esc(t)}?" ${danger ? 'data-danger="1"' : ''}>Run</button></div>`).join('')}</div></div>
+    <div class="card"><h3>Host</h3><div class="kv" id="sysHost"></div></div>`;
+  S.checks = checks; S.checksAt = Date.now();
+  await refreshSystem(false);
+  scheduleRefresh();
+}
+async function refreshSystem(manual) {
+  if (S.view !== 'system') return;
+  try {
+    const wantChecks = !!manual;
+    const [s, h, p, checks, live] = await Promise.all([api('GET', '/system'), api('GET', '/system/history?n=360'), api('GET', '/processes'), wantChecks ? api('GET', '/checks') : Promise.resolve(null), api('GET', '/live').catch(() => null)]);
+    if (S.view !== 'system' || !$('#sysStats')) return;
+    if (checks) { S.checks = checks; S.checksAt = Date.now(); $('#sysChecks').innerHTML = checksHtml(checks); }
+    fillLive(s, h, '#sysStats', '#sysCharts');
+    if (live && $('#sysLive')) $('#sysLive').innerHTML = liveHtml(live);
+    $('#sysCores').innerHTML = (s.cpu.per_core || []).map((c, i) => `<div class="core"><span>cpu${i}</span><div class="bar ${pctCls(c)}"><i style="width:${c}%"></i></div><span>${c}%</span></div>`).join('') || '<span class="muted">n/a</span>';
+    $('#sysProcs').innerHTML = `<div class="tablewrap"><table><tr><th>PID</th><th>Name</th><th>CPU</th><th>RAM</th><th>Age</th><th>Command</th><th></th></tr>
+      ${p.map(x => `<tr><td class="mono">${x.pid}</td><td><b>${esc(x.name)}</b>${x.self ? ' <span class="badge info plain">API</span>' : ''}</td><td>${x.cpu}%</td><td>${bytes(x.rss)}</td><td class="muted">${fmtUp(x.age_s)}</td>
+        <td class="mono" style="max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.cmd)}">${esc(x.cmd)}</td>
+        <td style="text-align:right">${x.child ? `<button class="btn danger sm" data-act="proc-kill" data-pid="${x.pid}" data-name="${esc(x.name)}">Kill</button>` : ''}</td></tr>`).join('')}</table></div>`;
+    $('#sysHost').innerHTML = [['Platform', s.host.platform], ['Python', s.host.python], ['CPU cores', s.host.cores + (s.host.cpu_limit_cores ? ` (container limit ${s.host.cpu_limit_cores})` : '')],
+      ['Load average', (s.host.load || ['n/a']).join('  ')], ['Machine booted', when(s.host.boot_time * 1000)], ['Library volume', s.disk.data_dir],
+      ['Open files / threads', `${s.app.fds ?? 'n/a'} / ${s.app.threads}`]].map(([k, v]) => `<div>${esc(k)}</div><div class="mono">${esc(v)}</div>`).join('');
+    arStamp();
+  } catch (e) { /* retry on the next tick */ }
+}
+
+/* ---------- settings ---------- */
+async function viewSettings() {
+  const rows = await api('GET', '/settings');
+  if (S.view !== 'settings') return;
+  $('#main').innerHTML = `<h2 class="title">Settings</h2><p class="sub">The values the server is running with (read-only; secrets are hidden). Change them with environment variables in <span class="mono">.env</span> / <span class="mono">docker-compose.yml</span>, then <span class="mono">docker compose up -d</span>.</p>
+    <div class="card"><div class="tablewrap"><table><tr><th>Setting</th><th>Environment variable</th><th>Value</th></tr>
+    ${rows.map(r => `<tr><td class="mono">${esc(r.key)}</td><td class="mono muted">${esc(r.env)}</td><td class="mono">${esc(typeof r.value === 'object' ? JSON.stringify(r.value) : String(r.value))}</td></tr>`).join('')}</table></div></div>`;
+}
+
+/* ---------- tasks ---------- */
+function taskCard(t) {
+  const open = S.openTasks.has(t.id) ? 'open' : '';
+  const ok = t.runs.filter(r => r.status === 'ok').length;
+  return `<details class="task" data-id="${esc(t.id)}" ${open}><summary>
+      ${badge(t.status)}${t.status === 'queued' && t.queue_position ? `<span class="badge warn plain">#${t.queue_position} in line</span>` : ''}<b>${esc(t.title || 'Unknown title')}</b>
+      <span class="muted">${esc(t.type)}${t.season != null ? ` S${t.season}E${t.episode}` : ''} · tmdb ${t.tmdb_id}</span>
+      <span class="muted" style="margin-left:auto">${ok}/${t.runs.length} sources · ${ago(t.created_at)}</span></summary>
+    <div class="body"><div class="hint" style="margin:0 0 8px"><span class="mono">${esc(t.id)}</span> · created ${when(t.created_at)} · expires ${when(t.expires_at)}</div>
+    ${t.runs.map(r => `<div class="run"><div><b>${r.starred ? starIcon() : ''}${esc(r.source)}</b><div class="hint" style="margin:0">shown as “${esc(r.public_name || '–')}”</div></div>
+      <div>${badge(r.status)} <span class="muted">${t.status === 'expired' ? 'results expired' : r.streams + ' streams'} · ${r.duration_ms ?? '–'} ms${r.peak_mb ? ' · ' + r.peak_mb + ' MB' : ''}</span>
+      ${r.error ? `<pre class="out" style="max-height:160px;color:var(--err)">${esc(r.error)}</pre>` : ''}</div></div>`).join('') || '<span class="muted">No sources ran for this task.</span>'}</div></details>`;
+}
+function bindTaskToggles() {
+  $$('details.task').forEach(d => d.addEventListener('toggle', () => { d.open ? S.openTasks.add(d.dataset.id) : S.openTasks.delete(d.dataset.id); }));
+}
+async function viewTasks() {
+  const tasks = await api('GET', '/tasks?limit=100');
+  if (S.view !== 'tasks') return;
+  $('#main').innerHTML = `
+    <h2 class="title">Tasks</h2><p class="sub">Every resolve request and what each source did with it.</p>
+    <div class="toolbar"><button class="btn ghost" data-act="tasks-refresh">${ico('refresh')} Refresh</button>
+      <span class="muted">${tasks.length} most recent</span></div>
+    ${tasks.map(taskCard).join('') || `<div class="card">${empty('No tasks yet', 'They appear here when your website calls /v1/resolve.')}</div>`}`;
+  bindTaskToggles();
+  if (tasks.some(t => ['pending', 'queued', 'running'].includes(t.status))) S.timer = setTimeout(() => S.view === 'tasks' && run(viewTasks), 2000);
+}
+
+/* ---------- actions ---------- */
+const actions = {
+  async login() {
+    S.token = $('#tok').value.trim(); $('#loginErr').textContent = '';
+    try { await api('GET', '/overview'); } catch (e) { $('#loginErr').textContent = e.message; return; }
+    sessionStorage.setItem('cr_admin', S.token); showApp(true); go('overview');
+  },
+  logout() { signOut(); },
+  menu() { $('#side').classList.toggle('open'); },
+  theme() {
+    const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const next = cur === 'dark' ? 'light' : 'dark'; localStorage.setItem('cr_theme', next); applyTheme(next);
+  },
+  nav(el) { go(el.dataset.v); },
+  copy(el) { navigator.clipboard.writeText(el.dataset.text).then(() => toast('Copied'), () => toast('Copy failed - select and copy manually', 'err')); },
+
+  async 'src-open'(el) { if (!(await canLeave())) return; await showSource(+el.dataset.id); },
+  async 'src-new'() { if (await canLeave()) newSourceForm(); },
+  async 'src-create'() {
+    const f = readForm('n'); if (!f.uses_browser) delete f.uses_browser;     // unticked = let auto-detect decide
+    const s = await api('POST', '/sources', f); toast('Source created');
+    await refreshSourcesList(); await showSource(s.id);
+  },
+  async 'src-star'(el) {
+    const id = +el.dataset.id, now = !S.sources.find(x => x.id === id).starred;
+    await api('PATCH', `/sources/${id}`, {starred: now});
+    await refreshSourcesList();
+    if (S.selected === id && $('#gStarred')) $('#gStarred').checked = now;
+    toast(now ? 'Starred: marked as a reliable source' : 'Star removed');
+  },
+  async 'src-save'() {
+    const f = readForm('g'), cur = S.sources.find(x => x.id === S.selected);
+    if (cur && f.uses_browser === cur.uses_browser) delete f.uses_browser;   // untouched: do not turn auto into manual
+    await api('PATCH', `/sources/${S.selected}`, f); toast('Settings saved'); await refreshSourcesList();
+    const s = S.sources.find(x => x.id === S.selected); if (s && $('#gBrowserHint')) $('#gBrowserHint').innerHTML = browserHint(s);
+    if (s && $('#gStats')) $('#gStats').innerHTML = statsHtml(s);
+  },
+  async 'src-browser-auto'() {
+    await api('PATCH', `/sources/${S.selected}`, {browser_auto: true}); await refreshSourcesList();
+    const s = S.sources.find(x => x.id === S.selected);
+    if (s && $('#gBrowser')) { $('#gBrowser').checked = s.uses_browser; $('#gBrowserHint').innerHTML = browserHint(s); }
+    toast('Back to auto-detect');
+  },
+  async 'src-delete'() {
+    const s = S.sources.find(x => x.id === S.selected);
+    if (!(await modal({title: `Delete “${s.name}”?`, text: 'The source and all its script versions will be removed. Past tasks keep their history.', ok: 'Delete', danger: true}))) return;
+    await api('DELETE', `/sources/${S.selected}`); S.selected = null; S.loadedCode = ''; toast('Source deleted'); viewSources();
+  },
+  async 'ver-load'(el) { if (await canLeave()) await loadVersion(+el.dataset.v); },
+  async 'ver-save'() {
+    const code = $('#code').value;
+    const r = await api('POST', `/sources/${S.selected}/scripts`, {code, note: $('#note').value, activate: $('#act').checked});
+    toast(`Saved as v${r.version}` + (r.active ? ' and activated' : ''));
+    S.scripts = await api('GET', `/sources/${S.selected}/scripts`); S.curVer = r.version; S.loadedCode = code;
+    renderVersions(); onEditorInput(); refreshSourcesList();
+  },
+  async 'ver-activate'() {
+    await api('POST', `/sources/${S.selected}/scripts/${S.curVer}/activate`); toast(`v${S.curVer} is now active`);
+    S.scripts = await api('GET', `/sources/${S.selected}/scripts`); renderVersions(); refreshSourcesList();
+  },
+  async 'test-run'() {
+    const body = {tmdb_id: +$('#tId').value, type: $('#tType').value, version: S.curVer || undefined, verbose: $('#tVerbose').checked,
+      season: $('#tS').value === '' ? null : +$('#tS').value, episode: $('#tE').value === '' ? null : +$('#tE').value};
+    if (!body.tmdb_id) { toast('Enter a TMDB id first', 'err'); return; }
+    if (isDirty()) toast('Testing the saved version, not the unsaved editor text', 'err');
+    const btn = $('#tBtn'); btn.disabled = true; $('#tOut').innerHTML = ''; testLogReset();
+    $('#tStop').classList.remove('hidden'); $('#tLive').classList.remove('hidden');
+    const sel = S.selected; let id = null;
+    try {
+      id = (await api('POST', `/sources/${sel}/test/start`, body)).test_id;
+      S.testId = id;
+      let after = 0;
+      for (;;) {
+        const r = await api('GET', `/tests/${id}?after=${after}`);
+        testLogAppend(r.logs); after = r.next;
+        if (r.status !== 'running') { testLogDone(r); if ($('#tOut')) renderTestResult(r.result, r.status); break; }
+        await new Promise(res => setTimeout(res, 400));
+        if (S.testId !== id || !$('#tLog')) break;      // started another test, or left this page (the test keeps running on the server)
+      }
+    } finally {
+      if (S.testId === id || id === null) S.testId = null;
+      const b = $('#tBtn'); if (b) b.disabled = false;
+      const st = $('#tStop'); if (st) st.classList.add('hidden');
+      const lv = $('#tLive'); if (lv) lv.classList.add('hidden');
+    }
+  },
+  async 'test-stop'() { if (S.testId) { await api('POST', `/tests/${S.testId}/cancel`); } },
+  async 'test-copylog'() { await navigator.clipboard.writeText((S.testLines || []).join('\n')).catch(() => {}); toast('Log copied'); },
+  'test-clearlog'() { S.testLines = []; if ($('#tLog')) $('#tLog').innerHTML = ''; },
+
+  async 'tg-save'() { const t = await api('PUT', '/telegram', tgRead()); toast('Saved'); await viewTelegram(); },
+  async 'tg-report'(el) {
+    el.disabled = true;
+    try {
+      const r = await api('POST', '/telegram/report');
+      if (r.ok) toast('Report sent: check the Daily report topic'); else toast(r.error + (r.hint ? ' → ' + r.hint : ''), 'err');
+    } finally { el.disabled = false; }
+  },
+  async 'tg-rmtoken'() {
+    if (!(await modal({title: 'Remove the bot token?', text: 'Alerts stop until you enter a token again.', ok: 'Remove', danger: true}))) return;
+    await api('PUT', '/telegram', {bot_token: ''}); toast('Token removed'); await viewTelegram();
+  },
+  async 'tg-test'(el) {
+    el.disabled = true;
+    try {
+      const r = await api('POST', '/telegram/test', {category: el.dataset.cat || null});
+      if (r.ok) toast('Sent: check the topic in Telegram'); else toast(r.error + (r.hint ? ' → ' + r.hint : ''), 'err');
+    } finally { el.disabled = false; }
+  },
+  async 'tg-find'(el) { el.disabled = true; $('#tgFound').innerHTML = '<p class="muted">Looking…</p>'; try { $('#tgFound').innerHTML = tgFoundHtml(await api('GET', '/telegram/updates')); } finally { el.disabled = false; } },
+  'tg-usechat'(el) { $('#tgChat').value = el.dataset.chat; toast('Chat id filled in: press Save'); },
+  'tg-usetopic'(el) {
+    const key = el.closest('tr').querySelector('.tgPick').value;
+    $(`#tgTopic_${key}`).value = el.dataset.topic; if (!$('#tgChat').value) $('#tgChat').value = el.dataset.chat;
+    toast('Topic filled in for “' + S.tg.categories.find(c => c.key === key).label + '”: press Save');
+  },
+  'src-export'() {
+    const rows = S.sources.map(x => `<label class="switch" style="display:flex;padding:3px 0"><input type="checkbox" class="xsrc" value="${x.id}" checked><span>${esc(x.name)}${x.public_name ? ` <span class="muted">(${esc(x.public_name)})</span>` : ''}</span></label>`).join('');
+    S.closeDlg = openDialog(`<h4>Export sources</h4>
+      <p>Downloads one JSON file with the settings and scripts of the chosen sources: a backup, or a way to move them to another server. Scripts can contain keys or passwords you typed into them, so keep the file private.</p>
+      <div class="form"><div><label class="l">Scripts</label><select id="xInc"><option value="active">Active version only (smaller)</option><option value="all">All versions (full backup)</option></select></div></div>
+      <div class="toolbar" style="margin:10px 0 4px"><b>Sources</b><span style="flex:1"></span><a href="#" id="xAll" style="color:var(--accent)">select all / none</a></div>
+      <div style="max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:9px;padding:6px 10px">${rows || '<span class="muted">No sources yet.</span>'}</div>
+      <div class="actions" style="margin-top:14px"><button class="btn ghost" data-close>Cancel</button><button class="btn" data-act="src-export-go">${ico('download')} Download</button></div>`);
+    $('#xAll').onclick = ev => { ev.preventDefault(); const all = $$('.xsrc'); const on = all.some(c => !c.checked); all.forEach(c => c.checked = on); };
+  },
+  async 'src-export-go'() {
+    const ids = $$('.xsrc').filter(c => c.checked).map(c => c.value);
+    if (!ids.length) { toast('Pick at least one source', 'err'); return; }
+    const r = await fetch(`/admin/sources/export?include=${$('#xInc').value}${ids.length === S.sources.length ? '' : '&ids=' + ids.join(',')}`, {headers: {'X-Admin-Token': S.token}});
+    if (r.status === 401) { signOut(); throw new Error('Invalid admin token'); }
+    if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch (e) {} throw new Error(m); }
+    const blob = await r.blob();
+    const name = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || 'candyresolver-sources.json';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    if (S.closeDlg) S.closeDlg(); toast(`Exported ${ids.length} source(s)`);
+  },
+  'src-import'() {
+    S.imp = {data: null};
+    S.closeDlg = openDialog(`<h4>Import sources</h4>
+      <p><b>Only import files you trust:</b> the scripts in them run on this server. Each script is checked first, and you see a preview before anything changes.</p>
+      <div class="form"><div><label class="l">File</label><input type="file" id="iFile" accept=".json,application/json"></div>
+        <div><label class="l">If a source with the same name already exists</label><select id="iMode"><option value="skip">Skip it (leave it as it is)</option><option value="update">Update it (settings + add the new script versions)</option><option value="copy">Import as a copy</option></select></div></div>
+      <div id="iPreview"></div>
+      <div class="actions" style="margin-top:14px"><button class="btn ghost" data-close>Cancel</button><button class="btn" id="iGo" data-act="src-import-go" disabled>${ico('upload')} Import</button></div>`);
+    $('#iFile').onchange = impPreview; $('#iMode').onchange = impPreview;
+  },
+  async 'src-import-go'(el) {
+    if (!S.imp || !S.imp.data) return;
+    el.disabled = true;
+    try {
+      const r = await api('POST', '/sources/import', {data: S.imp.data, mode: $('#iMode').value, dry_run: false});
+      if (S.closeDlg) S.closeDlg();
+      toast(`Imported: ${r.created} new, ${r.updated} updated, ${r.copied} copies${r.skipped ? `, ${r.skipped} skipped` : ''}`);
+      if (S.view === 'sources') await viewSources();
+    } finally { el.disabled = false; }
+  },
+  async 'key-create'() {
+    const name = $('#kName').value.trim(); if (!name) { toast('Give the key a name', 'err'); return; }
+    S.newKey = await api('POST', '/api-keys', {name, rate_limit_per_min: +$('#kRate').value || 60}); viewKeys();
+  },
+  async 'key-toggle'(el) { await api('PATCH', `/api-keys/${el.dataset.id}`, {enabled: el.dataset.en === '1'}); viewKeys(); },
+  async 'lib-del'(el) {
+    if (!(await modal({title: 'Delete this file?', text: 'It is removed from the server now (or the download is cancelled).', ok: 'Delete', danger: true}))) return;
+    await api('DELETE', `/library/${el.dataset.id}`); toast('Deleted'); refreshLibrary();
+  },
+  'lib-refresh'() { return refreshLibrary(); },
+  async 'files-refresh'() { S.fileLists = {}; S.fOpen.clear(); await viewFiles(); },
+  async 'files-open'(el) {
+    const r = await api('GET', `/files/${el.dataset.id}/link`);
+    if (r.kind === 'hls') { await navigator.clipboard.writeText(r.url).catch(() => {}); toast('HLS link copied: open it in VLC or any HLS player'); }
+    else window.open(r.url, '_blank', 'noopener');
+  },
+  async 'files-expand'(el) {
+    const id = el.dataset.id;
+    if (S.fOpen.has(id)) { S.fOpen.delete(id); renderFiles(); return; }
+    S.fOpen.add(id); renderFiles();
+    S.fileLists[id] = await api('GET', `/files/${id}`); renderFiles();
+  },
+  async 'files-del'(el) {
+    const id = el.dataset.id;
+    if (!(await modal({title: `Delete ${id}?`, text: 'The whole folder is removed from disk now. If it is still downloading, the download is cancelled.', ok: 'Delete', danger: true}))) return;
+    await api('DELETE', `/files/${id}`); toast('Deleted'); S.fOpen.delete(id); delete S.fileLists[id]; await viewFiles();
+  },
+  async 'live-end'(el) { await api('DELETE', `/live/${el.dataset.id}`); toast('Live stream ended'); refreshSystem(); },
+  async 'page-refresh'(el) {
+    el.disabled = true; clearTimeout(S.timer);
+    try { if (S.view === 'overview') await refreshOverview(true); else if (S.view === 'system') await refreshSystem(true); }
+    finally { el.disabled = false; scheduleRefresh(); }
+  },
+  async 'ac-save'() {
+    const a = await api('PUT', '/autoclean', {enabled: $('#acOn').checked, every_hours: +$('#acHours').value || 6, database: $('#acDb').checked, emergency: $('#acEm').checked, host: $('#acHost').checked, host_aggressive: $('#acHostAggr').checked});
+    $('#acBox').innerHTML = acHtml(a); toast('Saved');
+  },
+  async 'disk-scan'(el) {
+    el.disabled = true; $('#dcOut').innerHTML = '<p class="muted">Scanning…</p>';
+    try { const r = await api('POST', '/disk/scan' + ($('#dcHost').checked ? '?host=true' : '')); $('#dcOut').innerHTML = diskReport(r, false); hostAnswer(r.host); } finally { el.disabled = false; }
+  },
+  async 'disk-clean'(el) {
+    const db = $('#dcDb').checked;
+    if (!(await modal({title: 'Clean the disk now?', text: 'Removes the leftovers listed by Scan' + (db ? ' and tidies the database' : '') + ($('#dcHost').checked ? ' and cleans the host (the whole VPS)' : '') + '. Running downloads and fresh files are not touched. This cannot be undone.', ok: 'Clean disk', danger: true}))) return;
+    el.disabled = true; $('#dcOut').innerHTML = '<p class="muted">Cleaning…</p>';
+    try { const r = await api('POST', '/disk/clean', {database: db, host: $('#dcHost').checked, host_aggressive: $('#dcHostAggr').checked}); $('#dcOut').innerHTML = diskReport(r, true); toast(`Freed ${bytes(r.freed_bytes)}`); hostAnswer(r.host); loadAutoclean(); S.fileLists = {}; S.files = await api('GET', '/files'); if (S.view === 'files') renderFiles(); }
+    finally { el.disabled = false; }
+  },
+  async 'files-cleanup'(el) {
+    const what = el.dataset.what, all = what === 'everything';
+    if (!(await modal({title: all ? 'Delete EVERYTHING in the library?' : 'Delete all orphan folders?',
+        text: all ? 'Cancels every running download and removes every folder from disk. This cannot be undone.' : 'Removes folders that no active download points at (failed, expired, crash leftovers).', ok: all ? 'Delete everything' : 'Delete orphans', danger: true}))) return;
+    const r = await api('POST', '/files/cleanup', {what}); toast(`Removed ${r.removed} folder(s), freed ${bytes(r.freed_bytes)}`); await viewFiles();
+  },
+  async 'proc-kill'(el) {
+    if (!(await modal({title: `Kill ${el.dataset.name} (pid ${el.dataset.pid})?`, text: 'Use this for a stuck Chrome / ffmpeg. A running download or script that depends on it will fail.', ok: 'Kill', danger: true}))) return;
+    await api('DELETE', `/processes/${el.dataset.pid}`); toast('Killed'); refreshSystem();
+  },
+  async maint(el) {
+    const d = el.dataset;
+    if (!(await modal({title: d.label || 'Run this?', text: 'Run it now?', ok: 'Run', danger: d.danger === '1'}))) return;
+    const r = await api('POST', `/maintenance/${d.job}`); toast(r.affected == null ? 'Done' : `Done: ${r.affected} affected`);
+    if (d.then === 'library' || S.view === 'library') refreshLibrary();
+  },
+  async 'logs-clear'() { await api('POST', '/logs/clear'); toast('Log buffer cleared'); },
+  'logs-download'() {
+    const txt = (S.lv?.lines || []).map(l => `${new Date(l.ts * 1000).toISOString()} ${l.level} ${l.logger} ${l.msg}`).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type: 'text/plain'}));
+    a.download = `candyresolver-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.log`; a.click(); URL.revokeObjectURL(a.href);
+  },
+  'tasks-refresh'() { return viewTasks(); },
+};
+const changes = {
+  example(el) {
+    if (el.value === '') return; const ex = S.examples[+el.value]; el.value = '';
+    return (async () => {
+      if ($('#code').value.trim() && $('#code').value !== S.loadedCode &&
+          !(await modal({title: 'Replace editor content?', text: 'Nothing is saved until you click “Save as new version”.', ok: 'Replace'}))) return;
+      setCode(ex.code, false); $('#note').value = 'from example: ' + ex.name;
+    })();
+  },
+  ttype(el) { const tv = el.value === 'tv'; $('#tS').disabled = $('#tE').disabled = !tv; if (!tv) { $('#tS').value = $('#tE').value = ''; } },
+  libstatus(el) { S.libSt = el.value; renderLibrary(); },
+  fileorph(el) { S.fOrph = el.checked; renderFiles(); },
+  rate(el) { return api('PATCH', `/api-keys/${el.dataset.id}`, {rate_limit_per_min: +el.value}).then(() => toast('Rate limit saved')); },
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el || !actions[el.dataset.act]) return;
+  if (el.tagName === 'A') e.preventDefault();
+  run(() => actions[el.dataset.act](el, e));
+});
+document.addEventListener('change', e => {
+  const el = e.target.closest('[data-change]'); if (el && changes[el.dataset.change]) run(() => changes[el.dataset.change](el));
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'srcSearch') { S.srcFilter = e.target.value; renderSourceList(); }
+  if (e.target.id === 'libSearch') { S.libQ = e.target.value; renderLibrary(); }
+  if (e.target.id === 'fileSearch') { S.fq = e.target.value; renderFiles(); }
+});
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && $('#code')) { e.preventDefault(); run(() => actions['ver-save']()); }
+  if (e.key === 'Enter' && e.target.id === 'tok') run(() => actions.login());
+});
+
+/* ---------- start ---------- */
+paintShell();
+(async () => {
+  if (S.token) {
+    try { await api('GET', '/overview'); showApp(true); go('overview'); return; } catch (e) {}
+  }
+  showApp(false);
+})();
+</script>
+</body>
+</html>
